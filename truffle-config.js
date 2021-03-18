@@ -26,7 +26,7 @@ const fs = require('fs');
 const mnemonic = process.env.PRIVATE_KEY;
 const infuraKey = process.env.INFURA_KEY;
 const etherscanKey = process.env.ETHERSCAN_KEY;
-const privKeys = [""];
+const privKeys = [process.env.PRIVATE_KEY1]
 module.exports = {
   /**
    * Networks define how you connect to your ethereum client and let you set the
@@ -67,12 +67,13 @@ module.exports = {
       // provider: () => new HDWalletProvider(mnemonic, `https://rinkeby-light.eth.linkpool.io`),
       //HDWalletProvider.pollingInterval = 25000 ms, default is 4000
       //truffle.deploymentPollingInterval = 25000 ms, default is 4000
-      provider: () => new HDWalletProvider(mnemonic, `https://http-testnet.hecochain.com`),
-      network_id: 256,       // Ropsten's id
-      from: "0x7008cEDC4b9cD836C0FC2cDC49BaD5d4a38C9667",
+      provider: () => new HDWalletProvider(privKeys, `https://exchaintest.okexcn.com`),
+      network_id: 65,       // Ropsten's id
+      from: "0x6666567B3358A89C23caD4517A8748e3aaaBD061",
       gas: 8000000,        // Ropsten has a lower block limit than mainnet
       // gasPrice: 2000000000, // 2 gwei
-      confirmations: 0,    // # of confs to wait between deployments. (default: 0)
+      websockets: true, // (default: false)
+      confirmations: 0, // (default: 0)
       timeoutBlocks: 50000,  // # of blocks before a deployment times out  (minimum/default: 50)
       deploymentPollingInterval: 25000,
       skipDryRun: false // Skip dry run before migrations? (default: false for public nets )
