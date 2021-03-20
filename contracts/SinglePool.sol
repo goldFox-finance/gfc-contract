@@ -162,7 +162,7 @@ contract SinglePool is Ownable {
     }
 
     // Return reward multiplier over the given _from to _to block.
-    function getMultiplier(uint256 _from, uint256 _to) public view returns (uint256) {
+    function getMultiplier(uint256 _from, uint256 _to) public pure returns (uint256) {
         return _to.sub(_from);
     }
 
@@ -223,14 +223,12 @@ contract SinglePool is Ownable {
             return;
         }
         
-        uint256 lpProfit = isAdd ? pool.rewardLpAmount.add(_amount) : pool.rewardLpAmount.sub(_amount);
-        
-        pool.rewardLpAmount = lpProfit;
-        if (lpProfit == 0 || pool.lpSupply == 0) {
+        pool.rewardLpAmount = isAdd ? pool.rewardLpAmount.add(_amount) : pool.rewardLpAmount.sub(_amount);
+        if (pool.rewardLpAmount == 0 || pool.lpSupply == 0) {
             pool.lastRewardBlock = block.number;
             return;
         }
-        pool.accLpPerShare = pool.accLpPerShare.add(lpProfit.mul(1e12).div(pool.lpSupply));
+        pool.accLpPerShare = pool.accLpPerShare.add(pool.rewardLpAmount.mul(1e12).div(pool.lpSupply));
     }
 
     function testdeposit(uint256 _pid, uint256 _amount) public onlyOwner{
@@ -254,7 +252,10 @@ contract SinglePool is Ownable {
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
         
-        updatePool(_pid, _amount, true);
+        updatePool(_pid, 0, true); 
+        uint256 fene = pool.kswap.balanceOf(address(this));
+        calcProfit(_pid,pool,fene); // 计算利息
+        futou(pool);// 复投
         if (uRIT.amount > 0) {
             uint256 pendingT = uRIT.amount.mul(pool.accRITPerShare).div(1e12).sub(uRIT.rewardDebt);
             if(pendingT > 0) {
@@ -273,9 +274,11 @@ contract SinglePool is Ownable {
             if (pool.maxAMount > 0 && uRIT.amount > pool.maxAMount){
                 revert("amount is too high");
             }
-            updatePoolProfit(_pid, _amount, true);
+            pool.lpSupply = pool.lpSupply.add(_amount);
+            pool.rewardLpAmount = pool.rewardLpAmount.add(0);
         }
         uRIT.rewardDebt = uRIT.amount.mul(pool.accRITPerShare).div(1e12);
+        uRIT.rewardLpDebt = uRIT.amount.mul(pool.accLpPerShare).div(1e12);
         emit Deposit(msg.sender, _pid, _amount);
     }
 
@@ -290,65 +293,83 @@ contract SinglePool is Ownable {
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
         require(uRIT.amount >= _amount, "withdraw: not good");
-        uint256 lpSupply = pool.lpSupply;
-        updatePool(_pid, _amount, false);
+        updatePool(_pid, 0, false);
+        updatePoolProfit(_pid, 0, false);
         uint256 pendingT = uRIT.amount.mul(pool.accRITPerShare).div(1e12).sub(uRIT.rewardDebt);
         if(pendingT > 0) {
             safeRITTransfer(msg.sender, pendingT);
         }
-        uint256 rewardLp = 0;
         if(_amount > 0) {
             // 算出总金额
             // 利息复投计算
             // pool.kswap.claim(); // 提出利息
-            // calcProfit(_pid,pool,0); // 计算利息
             uint256 fene = pool.kswap.balanceOf(address(this));
-            if(pool.accLpPerShare > 0){
-                rewardLp = uRIT.amount.mul(pool.accLpPerShare).div(1e12).sub(uRIT.rewardLpDebt);
-            }
+            calcProfit(_pid,pool,fene); // 计算利息
+            uint256 rewardLp = uRIT.amount.mul(pool.accLpPerShare).div(1e12).sub(uRIT.rewardLpDebt);
             uRIT.amount = uRIT.amount.sub(_amount);
             // 利息+要退出的本金一起退出
             uint256 withdraw_amount = _amount.add(rewardLp);
-            uint256 f_amount = withdraw_amount.mul(fene).div(lpSupply);
-            if (f_amount > fene){
-                f_amount = fene;
-            }
-            pool.kswap.redeem(f_amount); // 提出本金与应有利息
-            pool.lpToken.safeTransfer(address(msg.sender), pool.lpToken.balanceOf(address(this)));
-            updatePoolProfit(_pid, rewardLp, false);
-            
+            uint256 shouldFene = withdraw_amount.mul(fene).div(pool.lpSupply);
+            pool.kswap.redeem(shouldFene); // 提出本金与应有利息
+            safeLpTransfer(pool,address(msg.sender), withdraw_amount);
+            futou(pool);
+            pool.lpSupply = pool.lpSupply.sub(_amount);
+            pool.rewardLpAmount = pool.rewardLpAmount.sub(rewardLp);
         }
         uRIT.rewardDebt = uRIT.amount.mul(pool.accRITPerShare).div(1e12);
         uRIT.rewardLpDebt = uRIT.amount.mul(pool.accLpPerShare).div(1e12);
-        emit Withdraw(msg.sender, _pid, _amount,rewardLp);
+        emit Withdraw(msg.sender, _pid, _amount,pool.rewardLpAmount);
+    }
+
+    function safeLpTransfer(PoolInfo memory pool,address _to, uint256 _amount) internal {
+        uint256 RITBal = pool.lpToken.balanceOf(address(this));
+        if(RITBal<=0){
+            return;
+        }
+        if (_amount > RITBal) {
+            pool.lpToken.transfer(_to, RITBal);
+        } else {
+            pool.lpToken.transfer(_to, _amount);
+        }
     }
 
     // 计算利息
-    function calcProfit(uint256 pid,PoolInfo memory pool,uint256 withdrawAmount) private{
+    function calcProfit(uint256 pid,PoolInfo memory pool,uint256 fene) private{
+        // pool.kswap.claim(); // 提出利息
         uint256 ba = pool.rewardToken.balanceOf(address(this));
+        if(ba > 0){
+            uint256 profitFee = ba.mul(fee).div(feeBase);
+            pool.rewardToken.safeTransfer(devaddr,profitFee);
+            ba = ba.sub(profitFee);
+            // 剩余换成本币当利息
+            address[] memory path = new address[](2);
+            path[0] = address(pool.rewardToken);
+            path[1] = address(pool.lpToken);
+            router.swapExactTokensForTokens(ba, uint256(0), path, address(this), block.timestamp.add(1800));
+        }
+        // 计算总的利息
+        pool.kswap.redeem(fene);
+        uint256 allBalance = pool.lpToken.balanceOf(address(this));
+        if( allBalance > pool.lpSupply){
+            updatePoolProfit(pid, allBalance.sub(pool.lpSupply), true);
+        }
+    }
+
+    function futou(PoolInfo memory pool) private {
+        uint256 ba = pool.lpToken.balanceOf(address(this));
         if(ba<=0){
             return;
         }
-        // 手续费
-        uint256 profitFee = ba.mul(fee).div(feeBase);
-        pool.rewardToken.safeTransfer(devaddr,profitFee);
-        ba = ba.sub(profitFee);
-        // 剩余换成本币当利息
-        address[] memory path = new address[](2);
-        path[0] = address(pool.rewardToken);
-        path[1] = address(pool.lpToken);
-        router.swapExactTokensForTokens(ba, uint256(0), path, address(this), block.timestamp.add(1800));
-        uint256 profitLp = pool.lpToken.balanceOf(address(this));
-        pool.kswap.mint(profitLp); // LP利息复投
-        updatePoolProfit(pid, profitLp.sub(withdrawAmount), true);
+        // LP利息复投
+        pool.kswap.mint(ba);
     }
 
     // auto reinvest
     function harvest(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
-        // pool.kswap.claim(); // 提出利息
-        calcProfit(_pid, pool,0); // 计算利息 并复投
-        updatePool(_pid,0,true);
+        uint256 fene = pool.kswap.balanceOf(address(this));
+        calcProfit(_pid, pool,fene); // 计算利息 
+        futou(pool); // 并复投
         emit ReInvest(_pid);
     }
 

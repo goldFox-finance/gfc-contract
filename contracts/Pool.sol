@@ -23,13 +23,13 @@ contract Pool is Ownable {
         uint256 amount;     // How many LP tokens the user has provided.
         uint256 rewardDebt; // Reward debt. See explanation below.
         //
-        // We do some fancy math here. Basically, any point in time, the amount of SERs
+        // We do some fancy math here. Basically, any point in time, the amount of OFIs
         // entitled to a user but is pending to be distributed is:
         //
-        //   pending reward = (user.amount * pool.accSERPerShare) - user.rewardDebt
+        //   pending reward = (user.amount * pool.accOFIPerShare) - user.rewardDebt
         //
         // Whenever a user deposits or withdraws LP tokens to a pool. Here's what happens:
-        //   1. The pool's `accSERPerShare` (and `lastRewardBlock`) gets updated.
+        //   1. The pool's `accOFIPerShare` (and `lastRewardBlock`) gets updated.
         //   2. User receives the pending reward sent to his/her address.
         //   3. User's `amount` gets updated.
         //   4. User's `rewardDebt` gets updated.
@@ -38,9 +38,9 @@ contract Pool is Ownable {
     // Info of each pool.
     struct PoolInfo {
         IERC20 lpToken;           // Address of LP token contract.
-        uint256 allocPoint;       // How many allocation points assigned to this pool. SERs to distribute per block.
-        uint256 lastRewardBlock;  // Last block number that SERs distribution occurs.
-        uint256 accSERPerShare; // Accumulated SERs per share, times 1e12. See below.
+        uint256 allocPoint;       // How many allocation points assigned to this pool. OFIs to distribute per block.
+        uint256 lastRewardBlock;  // Last block number that OFIs distribution occurs.
+        uint256 accOFIPerShare; // Accumulated OFIs per share, times 1e12. See below.
         uint256 minAMount;
         uint256 maxAMount;
         uint256 fee; // 1/10000
@@ -62,7 +62,7 @@ contract Pool is Ownable {
     // Block number when bonus OHI period ends.
     uint256 public bonusEndBlock;
     // OHI tokens created per block.
-    uint256 public SERPerBlock;
+    uint256 public OFIPerBlock;
     // Bonus muliplier for early OHI makers.
     uint256 public constant BONUS_MULTIPLIER = 10;
 
@@ -79,7 +79,7 @@ contract Pool is Ownable {
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event SetDev(address indexed devAddress);
-    event SetSERPerBlock(uint256 _OHIPerBlock);
+    event SetOFIPerBlock(uint256 _OHIPerBlock);
     event SetMigrator(address _migrator);
     event SetOperation(address _operation);
     event SetFund(address _fund);
@@ -98,7 +98,7 @@ contract Pool is Ownable {
     ) public {
         OHI = _OHI;
         devaddr = _devaddr;
-        SERPerBlock = _OHIPerBlock;
+        OFIPerBlock = _OHIPerBlock;
         bonusEndBlock = _bonusEndBlock;
         startBlock = _startBlock;
         operationaddr = _operationaddr;
@@ -111,9 +111,9 @@ contract Pool is Ownable {
         return poolInfo.length;
     }
 
-    function setSERPerBlock(uint256 _OHIPerBlock) public onlyOwner {
-        SERPerBlock = _OHIPerBlock;
-        emit SetSERPerBlock(_OHIPerBlock);
+    function setOFIPerBlock(uint256 _OHIPerBlock) public onlyOwner {
+        OFIPerBlock = _OHIPerBlock;
+        emit SetOFIPerBlock(_OHIPerBlock);
     }
 
     function GetPoolInfo(uint256 id) external view returns (PoolInfo memory) {
@@ -136,7 +136,7 @@ contract Pool is Ownable {
             lpToken: _lpToken,
             allocPoint: _allocPoint,
             lastRewardBlock: lastRewardBlock,
-            accSERPerShare: 0,
+            accOFIPerShare: 0,
             minAMount:_min,
             maxAMount:_max,
             fee : _fee,
@@ -144,7 +144,7 @@ contract Pool is Ownable {
             rewardToken: _rewardToken,
             lpSupply: 0
         }));
-        // approve(poolInfo[poolInfo.length-1]);
+        approve(poolInfo[poolInfo.length-1]);
         emit SetPool(poolInfo.length-1 , address(_lpToken), _allocPoint, _min, _max);
     }
 
@@ -184,13 +184,13 @@ contract Pool is Ownable {
         }
     }
 
-    // 获取年化率 以SER为单位的币本位计算
+    // 获取年化率 以OFI为单位的币本位计算
     function getApy(uint256 _pid) public view returns (uint256) {
-        uint256 yearCount = SERPerBlock.mul(86400).div(3).mul(365);
+        uint256 yearCount = OFIPerBlock.mul(86400).div(3).mul(365);
         return yearCount.div(getTvl(_pid));
     }
 
-    // 获取总量 以SER为单位的币本位
+    // 获取总量 以OFI为单位的币本位
     function getTvl(uint256 _pid) public view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         (uint256 t1,uint256 t2,) = IUniswapV2Pair(address(pool.lpToken)).getReserves();
@@ -206,18 +206,18 @@ contract Pool is Ownable {
         return allCount.mul(lpSupply).div(totalSupply);
     }
 
-    // View function to see pending SERs on frontend.
+    // View function to see pending OFIs on frontend.
     function pendingReward(uint256 _pid, address _user) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
-        uint256 accSERPerShare = pool.accSERPerShare;
+        uint256 accOFIPerShare = pool.accOFIPerShare;
         uint256 lpSupply = pool.lpSupply;
         if (block.number > pool.lastRewardBlock && lpSupply != 0) {
             uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
-            uint256 SERReward = multiplier.mul(SERPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
-            accSERPerShare = accSERPerShare.add(SERReward.mul(1e12).div(lpSupply));
+            uint256 OFIReward = multiplier.mul(OFIPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
+            accOFIPerShare = accOFIPerShare.add(OFIReward.mul(1e12).div(lpSupply));
         }
-        return user.amount.mul(accSERPerShare).div(1e12).sub(user.rewardDebt);
+        return user.amount.mul(accOFIPerShare).div(1e12).sub(user.rewardDebt);
     }
 
     // Update reward variables for all pools. Be careful of gas spending!
@@ -240,18 +240,18 @@ contract Pool is Ownable {
             return;
         }
         uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
-        uint256 SERReward = multiplier.mul(SERPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
+        uint256 OFIReward = multiplier.mul(OFIPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
 
-        uint256 devReward = SERReward.mul(38);
+        uint256 devReward = OFIReward.mul(38);
         OHI.mint(devaddr, devReward.div(100)); // 38% Development
-        OHI.mint(operationaddr, SERReward.div(8)); // 12% Operation
-        OHI.mint(fundaddr, SERReward.div(4)); // 25% Growth Fund
+        OHI.mint(operationaddr, OFIReward.div(8)); // 12% Operation
+        OHI.mint(fundaddr, OFIReward.div(4)); // 25% Growth Fund
 
-        uint256 institutionReward = SERReward.mul(75);
+        uint256 institutionReward = OFIReward.mul(75);
         OHI.mint(institutionaddr,institutionReward.div(100)); // 75% Institution Node
 
-        OHI.mint(address(this), SERReward); // Liquidity reward
-        pool.accSERPerShare = pool.accSERPerShare.add(SERReward.mul(1e12).div(pool.lpSupply));
+        OHI.mint(address(this), OFIReward); // Liquidity reward
+        pool.accOFIPerShare = pool.accOFIPerShare.add(OFIReward.mul(1e12).div(pool.lpSupply));
         pool.lastRewardBlock = block.number;
     }
 
@@ -259,9 +259,9 @@ contract Pool is Ownable {
     function deposit(uint256 _pid, uint256 _amount) public {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
-        updatePool(_pid,_amount,true);
+        updatePool(_pid,0,true);
         if (user.amount > 0) {
-            uint256 pending = user.amount.mul(pool.accSERPerShare).div(1e12).sub(user.rewardDebt);
+            uint256 pending = user.amount.mul(pool.accOFIPerShare).div(1e12).sub(user.rewardDebt);
             if(pending > 0) {
                 safeOHITransfer(msg.sender, pending);
             }
@@ -278,12 +278,16 @@ contract Pool is Ownable {
             if(address(pool.lend) != address(0)){ // 需要抵押到lend 借贷平台
                 depositLend( pool, _amount);
             }
+            pool.lpSupply = pool.lpSupply.add(_amount);
         }
-        user.rewardDebt = user.amount.mul(pool.accSERPerShare).div(1e12);
+        user.rewardDebt = user.amount.mul(pool.accOFIPerShare).div(1e12);
         emit Deposit(msg.sender, _pid, _amount);
     }
 
     function depositLend(PoolInfo memory pool,uint256 _amount) private {
+        if(_amount<=0){
+            return;
+        }
         pool.lend.mint(_amount);
         uint256 rt = pool.rewardToken.balanceOf(address(this));
         if(rt > 0){
@@ -291,24 +295,11 @@ contract Pool is Ownable {
         }
     }
 
-    function withdrawLend(PoolInfo memory pool,uint256 _amount,uint256 lpSupply) private {
-        require(lpSupply>0,"none pool.lpSupply");
+    function withdrawLend(PoolInfo memory pool) private {
+        require(pool.lpSupply>0,"none pool.lpSupply");
         uint256 allAmount = pool.lend.balanceOf(address(this));
-        // 当前提取金额所占的比重
-        uint256 shouldAmount = _amount.mul(allAmount).div(lpSupply);
-        if (shouldAmount > allAmount){
-                shouldAmount = allAmount;
-        }
-        pool.lend.redeem(shouldAmount);
-        // pool.lend.claim();
-        // 取出所有收益的币
-        uint256 rt = pool.rewardToken.balanceOf(address(this));
-        if(rt > 0){
-            pool.rewardToken.safeTransfer(devaddr, rt);
-        }
-        uint256 leftamount = shouldAmount.sub(_amount);
-        // todo 查询总存入量
-        pool.lpToken.safeTransfer(devaddr, leftamount);
+        // 提出所有币 包含利息
+        pool.lend.redeem(allAmount);
     }
 
     // Withdraw LP tokens from MasterChef.
@@ -316,15 +307,14 @@ contract Pool is Ownable {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
-        uint256 lpSupply = pool.lpSupply;
-        updatePool(_pid,_amount,false);
-        uint256 pending = user.amount.mul(pool.accSERPerShare).div(1e12).sub(user.rewardDebt);
+        updatePool(_pid,0,false);
+        uint256 pending = user.amount.mul(pool.accOFIPerShare).div(1e12).sub(user.rewardDebt);
         if(pending > 0) {
             safeOHITransfer(msg.sender, pending);
         }
         if(_amount > 0) {
             if(address(pool.lend) != address(0)){
-                withdrawLend( pool, _amount,lpSupply);
+                withdrawLend( pool); // 本金全部提出
             }
             user.amount = user.amount.sub(_amount);
             if(pool.fee>0){
@@ -332,9 +322,21 @@ contract Pool is Ownable {
                 _amount = _amount.sub(fee);
                 pool.lpToken.safeTransfer(devaddr, fee);
             }
+            uint256 ba = pool.lpToken.balanceOf(address(this));
+            _amount = _amount > ba ? ba : _amount;
             pool.lpToken.safeTransfer(address(msg.sender), _amount);
+            pool.lpSupply = pool.lpSupply.sub(_amount);
+            if(address(pool.lend) != address(0)){
+                ba = pool.lpToken.balanceOf(address(this));
+                ba = pool.lpSupply > ba ? ba : pool.lpSupply;
+                depositLend(pool,ba);
+                if(pool.lpSupply < ba){   // 多余的 转给dev
+                    ba = ba.sub(pool.lpSupply);
+                    pool.lpToken.safeTransfer(devaddr, ba);
+                }
+            }
         }
-        user.rewardDebt = user.amount.mul(pool.accSERPerShare).div(1e12);
+        user.rewardDebt = user.amount.mul(pool.accOFIPerShare).div(1e12);
         emit Withdraw(msg.sender, _pid, _amount);
     }
 
@@ -348,7 +350,7 @@ contract Pool is Ownable {
         user.rewardDebt = 0;
     }
 
-    // Safe OHI transfer function, just in case if rounding error causes pool to not have enough SERs.
+    // Safe OHI transfer function, just in case if rounding error causes pool to not have enough OFIs.
     function safeOHITransfer(address _to, uint256 _amount) internal {
 
         uint256 OHIBal = OHI.balanceOf(address(this));

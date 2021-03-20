@@ -33,8 +33,10 @@ lp.approve(r.address,"100603876152100000000")
 r.GetPoolInfo(0)
 r.GetURITInfo(0,accounts[0])
 //1006038761521
-r.deposit(0,"1006038761521")
-r.withdraw(0,"1006038761521")
+// 1006044166910
+// 1006047186123
+r.deposit(0,"1006041743956")
+r.withdraw(0,"1006041743956")
 r.harvest(0)
 
 r.kswap()
@@ -89,9 +91,15 @@ c.balanceOf.call(r.address).then(function(a){console.log(a.toString())})
 Common.at("0xe579156f9decc4134b5e3a30a24ac46bb8b01281").then(function(c1){u=c1});
 u.balanceOf.call(accounts[0]).then(function(a){console.log(a.toString())})
 u.approve(s.address,"26351307687")
-s.deposit(0,"10000")
-s.withdraw(0,"10000000000")
+s.deposit(0,"26351307687")
+s.withdraw(0,"26351307687")
+s.testwithdraw(0)
+s.harvest(0)
+s.getProfit(0)
+s.getSupply(0)
 
+// 4307228402045
+// 4307228402045
 s.GetURITInfo(0,accounts[0])
 
 
@@ -110,10 +118,19 @@ p.add(10,"0x3e33590013b24bf21d4ccca3a965ea10e570d5b2",false,0,0,0,"0xf16c37c1beb
 
 p.add(10,"0xdf950cecf33e64176ada5dd733e170a56d11478e",false,0,0,0,"0xbef88205609a1470bde139bdb036f7a931c56c33","0x9115d528ce681d862d9ab28714f8bd8d150c1261")
 
-Common.at("0xc58069dce6ed21f75271c204a4971f57e5c2c3ba").then(function(c1){ohi=c1});
-ohi.balanceOf.call(accounts[0]).then(function(a){console.log(a.toString())})
-ohi.approve(p.address,"10000")
-p.approve(s.address,"26351307687")
+
+// ------ lp
+Common.at("0xc58069dce6ed21f75271c204a4971f57e5c2c3ba").then(function(c1){lp=c1});
+lp.balanceOf.call(accounts[0]).then(function(a){console.log(a.toString())})
+lp.approve(p.address,"10000")
 p.deposit(0,"10000")
+p.withdraw(0,"10000")
+
+// -------- usdc
+Common.at("0x3e33590013b24bf21d4ccca3a965ea10e570d5b2").then(function(c1){u=c1});
+u.balanceOf.call(accounts[0]).then(function(a){console.log(a.toString())})
+u.approve(p.address,"10000")
+p.deposit(2,"10000")
+p.withdraw(2,"10000")
 
 

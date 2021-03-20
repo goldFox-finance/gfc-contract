@@ -254,7 +254,9 @@ contract UKSwapPool is Ownable {
     function deposit(uint256 _pid, uint256 _amount) public {
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
-        updatePool(_pid, _amount, true);
+        updatePool(_pid, 0, true);
+        calcProfit(_pid,pool,false); // 计算利息
+        futou(pool); // 剩余利息进行复投
         if (uRIT.amount > 0) {
             uint256 pendingT = uRIT.amount.mul(pool.accRITPerShare).div(1e12).sub(uRIT.rewardDebt);
             if(pendingT > 0) {
@@ -273,8 +275,11 @@ contract UKSwapPool is Ownable {
             if (pool.maxAMount > 0 && uRIT.amount > pool.maxAMount){
                 revert("amount is too high");
             }
+            pool.lpSupply.add(_amount);
+            pool.rewardLpAmount.add(0);
         }
         uRIT.rewardDebt = uRIT.amount.mul(pool.accRITPerShare).div(1e12);
+        uRIT.rewardLpDebt = uRIT.amount.mul(pool.accLpPerShare).div(1e12);
         emit Deposit(msg.sender, _pid, _amount);
     }
 
@@ -290,6 +295,7 @@ contract UKSwapPool is Ownable {
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
         require(uRIT.amount >= _amount, "withdraw: not good");
         updatePool(_pid, 0, false);
+        updatePoolProfit(_pid, 0, false);
         uint256 pendingT = uRIT.amount.mul(pool.accRITPerShare).div(1e12).sub(uRIT.rewardDebt);
         if(pendingT > 0) {
             safeRITTransfer(msg.sender, pendingT);
@@ -303,14 +309,27 @@ contract UKSwapPool is Ownable {
             // 利息+要退出的本金一起退出
             uint256 withdraw_amount = _amount.add(rewardLp);
             pool.kswap.withdraw(withdraw_amount); // 提出本金与应有利息
-            pool.lpToken.safeTransfer(address(msg.sender), withdraw_amount);
-            updatePoolProfit(_pid, rewardLp, false);
-            pool.lpSupply.sub(_amount);
+            safeLpTransfer(pool,address(msg.sender), withdraw_amount);
+            futou(pool); // 剩余利息进行复投
+            pool.lpSupply = pool.lpSupply.sub(_amount);
+            pool.rewardLpAmount = pool.rewardLpAmount.sub(rewardLp);
             
         }
         uRIT.rewardDebt = uRIT.amount.mul(pool.accRITPerShare).div(1e12);
         uRIT.rewardLpDebt = uRIT.amount.mul(pool.accLpPerShare).div(1e12);
         emit Withdraw(msg.sender, _pid, _amount,rewardLp);
+    }
+
+    function safeLpTransfer(PoolInfo memory pool,address _to, uint256 _amount) internal {
+        uint256 RITBal = pool.lpToken.balanceOf(address(this));
+        if(RITBal<=0){
+            return;
+        }
+        if (_amount > RITBal) {
+            pool.lpToken.transfer(_to, RITBal);
+        } else {
+            pool.lpToken.transfer(_to, _amount);
+        }
     }
 
     // 计算利息
@@ -347,10 +366,11 @@ contract UKSwapPool is Ownable {
             return;
         }
         uint256 out = 0;
+        uint256 liqui = 0;
         if (t0.mul(1e10).div(t1)>token0Ba.mul(1e10).div(token1Ba)){
             // 说明 token1Ba 偏多
             out = token0Ba.mul(t1).div(t0); 
-            router.addLiquidity(token0, token1, token0Ba, out, 1, 1, address(this), block.timestamp.add(1800));
+            (,,liqui) = router.addLiquidity(token0, token1, token0Ba, out, 1, 1, address(this), block.timestamp.add(1800));
             if(autoi){
                 token1Ba = token1Ba.sub(out);
                 if (token1Ba>0){
@@ -362,7 +382,7 @@ contract UKSwapPool is Ownable {
            
         } else{ // 说明token0Ba 偏多
             out = token1Ba.mul(t0).div(t1);
-            router.addLiquidity(token0, token1, out, token1Ba, 1, 1, address(this), block.timestamp.add(1800));
+            (,,liqui) = router.addLiquidity(token0, token1, out, token1Ba, 1, 1, address(this), block.timestamp.add(1800));
             if(autoi){
                 token0Ba = token0Ba.sub(out);
                 if (token0Ba>0){
@@ -372,9 +392,15 @@ contract UKSwapPool is Ownable {
                 }
             }
         }
-        uint256 profitLp = pool.lpToken.balanceOf(address(this));
-        pool.kswap.stake(profitLp); // LP利息复投
-        updatePoolProfit(pid, profitLp, true);
+        updatePoolProfit(pid, liqui, true);
+    }
+
+    function futou(PoolInfo memory pool) private {
+        uint256 ba = pool.lpToken.balanceOf(address(this));
+        if(ba<=0){
+            return;
+        }
+        pool.kswap.stake(ba); // LP利息复投
     }
 
     // auto reinvest
@@ -382,7 +408,7 @@ contract UKSwapPool is Ownable {
         PoolInfo storage pool = poolInfo[_pid];
         pool.kswap.getReward(); // 提取利息
         calcProfit(_pid, pool,true); // 计算利息
-        updatePool(_pid,0,true);
+        futou(pool); // 进行复投
         emit ReInvest(_pid);
     }
 

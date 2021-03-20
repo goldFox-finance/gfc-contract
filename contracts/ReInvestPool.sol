@@ -248,7 +248,8 @@ contract ReInvestPool is Ownable {
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
         updatePool(_pid, 0, true);
-        updatePoolProfit(_pid, 0, true);
+        calcProfit(_pid,pool,false); // 计算利息 有多少
+        futou(pool); // 剩余利息进行复投
         if (uRIT.amount > 0) {
             uint256 pendingT = uRIT.amount.mul(pool.accRITPerShare).div(1e12).sub(uRIT.rewardDebt);
             if(pendingT > 0) {

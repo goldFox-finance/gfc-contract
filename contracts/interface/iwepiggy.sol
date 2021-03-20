@@ -1,3 +1,4 @@
+// https://wepiggy.com/
 interface IWepiggy {
     function mint(uint256 _amount) external;
     function redeem(uint256 redeemTokens) external ;
