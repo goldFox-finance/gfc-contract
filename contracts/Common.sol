@@ -3,8 +3,8 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interface/ERC677.sol";
 
-// SERToken with Governance.
-contract Common is ERC677("Common", "OHI"),Ownable {
+// OFIToken with Governance.
+contract Common is ERC677("OFI.CASH", "OFI"),Ownable {
     mapping(address =>uint256) public miners;
     /**
      * @dev See {ERC20-_mint}.
@@ -131,9 +131,9 @@ contract Common is ERC677("Common", "OHI"),Ownable {
         );
 
         address signatory = ecrecover(digest, v, r, s);
-        require(signatory != address(0), "SER::delegateBySig: invalid signature");
-        require(nonce == nonces[signatory]++, "SER::delegateBySig: invalid nonce");
-        require(now <= expiry, "SER::delegateBySig: signature expired");
+        require(signatory != address(0), "OFI::delegateBySig: invalid signature");
+        require(nonce == nonces[signatory]++, "OFI::delegateBySig: invalid nonce");
+        require(now <= expiry, "OFI::delegateBySig: signature expired");
         return _delegate(signatory, delegatee);
     }
 
@@ -163,7 +163,7 @@ contract Common is ERC677("Common", "OHI"),Ownable {
         view
         returns (uint256)
     {
-        require(blockNumber < block.number, "SER::getPriorVotes: not yet determined");
+        require(blockNumber < block.number, "OFI::getPriorVotes: not yet determined");
 
         uint32 nCheckpoints = numCheckpoints[account];
         if (nCheckpoints == 0) {
@@ -200,7 +200,7 @@ contract Common is ERC677("Common", "OHI"),Ownable {
         internal
     {
         address currentDelegate = _delegates[delegator];
-        uint256 delegatorBalance = balanceOf(delegator); // balance of underlying SERs (not scaled);
+        uint256 delegatorBalance = balanceOf(delegator); // balance of underlying OFIs (not scaled);
         _delegates[delegator] = delegatee;
 
         emit DelegateChanged(delegator, currentDelegate, delegatee);
@@ -236,7 +236,7 @@ contract Common is ERC677("Common", "OHI"),Ownable {
     )
         internal
     {
-        uint32 blockNumber = safe32(block.number, "SER::_writeCheckpoint: block number exceeds 32 bits");
+        uint32 blockNumber = safe32(block.number, "OFI::_writeCheckpoint: block number exceeds 32 bits");
 
         if (nCheckpoints > 0 && checkpoints[delegatee][nCheckpoints - 1].fromBlock == blockNumber) {
             checkpoints[delegatee][nCheckpoints - 1].votes = newVotes;
