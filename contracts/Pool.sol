@@ -7,10 +7,10 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
-// MasterChef is the master of OHI. He can make OHI and he is a fair guy.
+// MasterChef is the master of OFI. He can make OFI and he is a fair guy.
 //
 // Note that it's ownable and the owner wields tremendous power. The ownership
-// will be transferred to a governance smart contract once OHI is sufficiently
+// will be transferred to a governance smart contract once OFI is sufficiently
 // distributed and the community can show to govern itself.
 //
 // Have fun reading it. Hopefully it's bug-free. God bless.
@@ -22,6 +22,7 @@ contract Pool is Ownable {
     struct UserInfo {
         uint256 amount;     // How many LP tokens the user has provided.
         uint256 rewardDebt; // Reward debt. See explanation below.
+        uint256 lockTime;
         //
         // We do some fancy math here. Basically, any point in time, the amount of OFIs
         // entitled to a user but is pending to be distributed is:
@@ -43,14 +44,17 @@ contract Pool is Ownable {
         uint256 accOFIPerShare; // Accumulated OFIs per share, times 1e12. See below.
         uint256 minAMount;
         uint256 maxAMount;
-        uint256 fee; // 1/10000
+        uint256 deposit_fee; // 1/10000
+        uint256 withdraw_fee; // 1/10000
         IWepiggy lend; // 1/10000
         IERC20 rewardToken; // 1/10000
         uint256 lpSupply;
     }
 
-    // The OHI TOKEN!
-    Common public OHI;
+    // The OFI TOKEN!
+    Common public OFI;
+    // Fee address.
+    address public feeaddr;
     // Dev address.
     address public devaddr;
     // Operation address.
@@ -59,12 +63,11 @@ contract Pool is Ownable {
     address public fundaddr;
     // institution address.
     address public institutionaddr;
-    // Block number when bonus OHI period ends.
-    uint256 public bonusEndBlock;
-    // OHI tokens created per block.
+    // OFI tokens created per block.
     uint256 public OFIPerBlock;
-    // Bonus muliplier for early OHI makers.
-    uint256 public constant BONUS_MULTIPLIER = 10;
+    // Bonus muliplier for early OFI makers.
+    uint256 public LockMulti = 1;
+    uint256 public LockTime = 30 days;
 
     // Info of each pool.
     PoolInfo[] public poolInfo;
@@ -72,48 +75,55 @@ contract Pool is Ownable {
     mapping (uint256 => mapping (address => UserInfo)) public userInfo;
     // Total allocation poitns. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
-    // The block number when OHI mining starts.
-    uint256 public startBlock;
 
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event SetDev(address indexed devAddress);
-    event SetOFIPerBlock(uint256 _OHIPerBlock);
+    event SetOFIPerBlock(uint256 _OFIPerBlock);
     event SetMigrator(address _migrator);
     event SetOperation(address _operation);
     event SetFund(address _fund);
     event SetInstitution(address _institution);
+    event SetFee(address _feeaddr);
     event SetPool(uint256 pid ,address lpaddr,uint256 point,uint256 min,uint256 max);
     constructor(
-        Common _OHI,
+        Common _OFI,
+        address _feeaddr,
         address _devaddr,
         address _operationaddr,
         address _fundaddr,
         address _institutionaddr,
-        uint256 _OHIPerBlock,
-        uint256 _startBlock,
-        uint256 _bonusEndBlock,
+        uint256 _OFIPerBlock,
+        uint256 _LockMulti,
         IUniswapV2Router02 _router
     ) public {
-        OHI = _OHI;
+        OFI = _OFI;
         devaddr = _devaddr;
-        OFIPerBlock = _OHIPerBlock;
-        bonusEndBlock = _bonusEndBlock;
-        startBlock = _startBlock;
+        feeaddr = _feeaddr;
+        OFIPerBlock = _OFIPerBlock;
         operationaddr = _operationaddr;
         fundaddr = _fundaddr;
         institutionaddr = _institutionaddr;
         router = _router;
+        LockMulti = _LockMulti;
     }
 
     function poolLength() external view returns (uint256) {
         return poolInfo.length;
     }
 
-    function setOFIPerBlock(uint256 _OHIPerBlock) public onlyOwner {
-        OFIPerBlock = _OHIPerBlock;
-        emit SetOFIPerBlock(_OHIPerBlock);
+    function setOFIPerBlock(uint256 _OFIPerBlock) public onlyOwner {
+        OFIPerBlock = _OFIPerBlock;
+        emit SetOFIPerBlock(_OFIPerBlock);
+    }
+
+    function setLockTime(uint256 _lockTime) public onlyOwner {
+        LockTime = _lockTime;
+    }
+
+    function setLockMulti(uint256 _lockMulti) public onlyOwner {
+        LockMulti = _lockMulti;
     }
 
     function GetPoolInfo(uint256 id) external view returns (PoolInfo memory) {
@@ -124,13 +134,21 @@ contract Pool is Ownable {
         return userInfo[id][addr];
     }
 
+    // 设置锁仓时间 30天一周期
+    function SetUserLock(uint256 id) public {
+        UserInfo storage user = userInfo[id][msg.sender];
+        require(user.amount>0,"need deposit first");
+        require(user.lockTime<=0,"has lock already");
+        user.lockTime.add(now).add(LockTime);
+    }
+
     // Add a new lp to the pool. Can only be called by the owner.
     // XXX DO NOT add the same LP token more than once. Rewards will be messed up if you do.
-    function add(uint256 _allocPoint, IERC20 _lpToken, bool _withUpdate,uint256 _min,uint256 _max,uint256 _fee,IWepiggy _lend,IERC20 _rewardToken) public onlyOwner {
+    function add(uint256 _allocPoint, IERC20 _lpToken, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,IWepiggy _lend,IERC20 _rewardToken) public onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
         }
-        uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
+        uint256 lastRewardBlock = block.number;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
         poolInfo.push(PoolInfo({
             lpToken: _lpToken,
@@ -139,7 +157,8 @@ contract Pool is Ownable {
             accOFIPerShare: 0,
             minAMount:_min,
             maxAMount:_max,
-            fee : _fee,
+            deposit_fee : _deposit_fee,
+            withdraw_fee : _withdraw_fee,
             lend: _lend,
             rewardToken: _rewardToken,
             lpSupply: 0
@@ -156,8 +175,8 @@ contract Pool is Ownable {
         }
     }
 
-    // Update the given pool's OHI allocation point. Can only be called by the owner.
-    function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate,uint256 _min,uint256 _max,uint256 _fee,IWepiggy _lend,IERC20 _rewardToken) public onlyOwner {
+    // Update the given pool's OFI allocation point. Can only be called by the owner.
+    function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,IWepiggy _lend,IERC20 _rewardToken) public onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
         }
@@ -165,7 +184,8 @@ contract Pool is Ownable {
         poolInfo[_pid].allocPoint = _allocPoint;
         poolInfo[_pid].minAMount = _min;
         poolInfo[_pid].maxAMount = _max;
-        poolInfo[_pid].fee = _fee;
+        poolInfo[_pid].deposit_fee = _deposit_fee;
+        poolInfo[_pid].withdraw_fee = _withdraw_fee;
         poolInfo[_pid].lend = _lend;
         poolInfo[_pid].rewardToken = _rewardToken;
         emit SetPool(_pid , address(poolInfo[_pid].lpToken), _allocPoint, _min, _max);
@@ -173,15 +193,7 @@ contract Pool is Ownable {
 
     // Return reward multiplier over the given _from to _to block.
     function getMultiplier(uint256 _from, uint256 _to) public view returns (uint256) {
-        if (_to <= bonusEndBlock) {
-            return _to.sub(_from).mul(BONUS_MULTIPLIER);
-        } else if (_from >= bonusEndBlock) {
-            return _to.sub(_from);
-        } else {
-            return bonusEndBlock.sub(_from).mul(BONUS_MULTIPLIER).add(
-                _to.sub(bonusEndBlock)
-            );
-        }
+        return _to.sub(_from);
     }
 
     // 获取年化率 以OFI为单位的币本位计算
@@ -196,7 +208,7 @@ contract Pool is Ownable {
         (uint256 t1,uint256 t2,) = IUniswapV2Pair(address(pool.lpToken)).getReserves();
         address token0 = IUniswapV2Pair(address(pool.lpToken)).token0();
         uint256 allCount = 0;
-        if(token0==address(OHI)){ // 总成本
+        if(token0==address(OFI)){ // 总成本
             allCount = t1.mul(2);
         } else{
             allCount = t2.mul(2);
@@ -217,7 +229,11 @@ contract Pool is Ownable {
             uint256 OFIReward = multiplier.mul(OFIPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
             accOFIPerShare = accOFIPerShare.add(OFIReward.mul(1e12).div(lpSupply));
         }
-        return user.amount.mul(accOFIPerShare).div(1e12).sub(user.rewardDebt);
+        uint256 pending = user.amount.mul(accOFIPerShare).div(1e12).sub(user.rewardDebt);
+        if(user.lockTime > now){
+            return pending;
+        }
+        return pending.div(LockMulti);
     }
 
     // Update reward variables for all pools. Be careful of gas spending!
@@ -242,20 +258,21 @@ contract Pool is Ownable {
         uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
         uint256 OFIReward = multiplier.mul(OFIPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
 
-        uint256 devReward = OFIReward.mul(38);
-        OHI.mint(devaddr, devReward.div(100)); // 38% Development
-        OHI.mint(operationaddr, OFIReward.div(8)); // 12% Operation
-        OHI.mint(fundaddr, OFIReward.div(4)); // 25% Growth Fund
+        uint256 devReward = OFIReward.mul(15);
+        OFI.mint(devaddr, devReward.div(100)); // 15% Development
+        OFI.mint(operationaddr, OFIReward.div(20)); // 5% Operation
+        OFI.mint(fundaddr, OFIReward.div(10)); // 10% Growth Fund
 
-        uint256 institutionReward = OFIReward.mul(75);
-        OHI.mint(institutionaddr,institutionReward.div(100)); // 75% Institution Node
+        uint256 institutionReward = OFIReward.mul(10);
+        OFI.mint(institutionaddr,institutionReward.div(100)); // 10% Institution Node
 
-        OHI.mint(address(this), OFIReward); // Liquidity reward
+        uint256 miningReward = OFIReward.mul(60);
+        OFI.mint(address(this), miningReward.div(100)); // 60% Liquidity reward
         pool.accOFIPerShare = pool.accOFIPerShare.add(OFIReward.mul(1e12).div(pool.lpSupply));
         pool.lastRewardBlock = block.number;
     }
 
-    // Deposit LP tokens to MasterChef for OHI allocation.
+    // Deposit LP tokens to MasterChef for OFI allocation.
     function deposit(uint256 _pid, uint256 _amount) public {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
@@ -263,10 +280,18 @@ contract Pool is Ownable {
         if (user.amount > 0) {
             uint256 pending = user.amount.mul(pool.accOFIPerShare).div(1e12).sub(user.rewardDebt);
             if(pending > 0) {
-                safeOHITransfer(msg.sender, pending);
+                if(user.lockTime <= 0){ // 没有锁仓 需要减少收益
+                    pending = pending.div(LockMulti);
+                }
+                safeOFITransfer(msg.sender, pending);
             }
         }
         if(_amount > 0) {
+            if(pool.deposit_fee > 0){
+                uint256 feeR = _amount.mul(pool.deposit_fee).div(10000);
+                pool.lpToken.safeTransferFrom(address(msg.sender), devaddr, feeR);
+                _amount = _amount.sub(feeR);
+            }
             pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
             user.amount = user.amount.add(_amount);
             if (pool.minAMount > 0 && user.amount < pool.minAMount){
@@ -291,7 +316,7 @@ contract Pool is Ownable {
         pool.lend.mint(_amount);
         uint256 rt = pool.rewardToken.balanceOf(address(this));
         if(rt > 0){
-            pool.rewardToken.safeTransfer(devaddr, rt);
+            pool.rewardToken.safeTransfer(feeaddr, rt);
         }
     }
 
@@ -310,15 +335,19 @@ contract Pool is Ownable {
         updatePool(_pid,0,false);
         uint256 pending = user.amount.mul(pool.accOFIPerShare).div(1e12).sub(user.rewardDebt);
         if(pending > 0) {
-            safeOHITransfer(msg.sender, pending);
+            if(user.lockTime <= 0){ // 没有锁仓 需要减少收益
+                pending = pending.div(LockMulti);
+            }
+            safeOFITransfer(msg.sender, pending);
         }
         if(_amount > 0) {
+            require(user.lockTime<=now,"mining in lock,can not withdraw");
             if(address(pool.lend) != address(0)){
                 withdrawLend( pool); // 本金全部提出
             }
             user.amount = user.amount.sub(_amount);
-            if(pool.fee>0){
-                uint256 fee = _amount.mul(pool.fee).div(10000);      
+            if(pool.withdraw_fee>0){
+                uint256 fee = _amount.mul(pool.withdraw_fee).div(10000);      
                 _amount = _amount.sub(fee);
                 pool.lpToken.safeTransfer(devaddr, fee);
             }
@@ -350,15 +379,15 @@ contract Pool is Ownable {
         user.rewardDebt = 0;
     }
 
-    // Safe OHI transfer function, just in case if rounding error causes pool to not have enough OFIs.
-    function safeOHITransfer(address _to, uint256 _amount) internal {
+    // Safe OFI transfer function, just in case if rounding error causes pool to not have enough OFIs.
+    function safeOFITransfer(address _to, uint256 _amount) internal {
 
-        uint256 OHIBal = OHI.balanceOf(address(this));
+        uint256 OFIBal = OFI.balanceOf(address(this));
         
-        if (_amount > OHIBal) {
-            OHI.transfer(_to, OHIBal);
+        if (_amount > OFIBal) {
+            OFI.transfer(_to, OFIBal);
         } else {
-            OHI.transfer(_to, _amount);
+            OFI.transfer(_to, _amount);
         }
     }
 
@@ -388,9 +417,17 @@ contract Pool is Ownable {
 
     // Update institution address by the previous institution.
     function institution(address _institutionaddr) public {
-        require(msg.sender == _institutionaddr, "institution: wut?");
+        require(msg.sender == institutionaddr, "institution: wut?");
         require(_institutionaddr != address(0), "_institutionaddr is address(0)");
         institutionaddr = _institutionaddr;
         emit SetInstitution(_institutionaddr);
+    }
+
+    // Update fee address by the previous institution.
+    function setFee(address _feeaddr) public {
+        require(msg.sender == feeaddr, "feeaddr: wut?");
+        require(_feeaddr != address(0), "_feeaddr is address(0)");
+        feeaddr = _feeaddr;
+        emit SetFee(_feeaddr);
     }
 }

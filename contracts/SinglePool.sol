@@ -49,19 +49,15 @@ contract SinglePool is Ownable {
         uint256 rewardLpAmount;
         uint256 lpSupply;
         uint256 accLpPerShare; // 利润分配
+        uint256 deposit_fee; // 1/10000
+        uint256 withdraw_fee; // 1/10000
     }
     // The RIT TOKEN!
     Common public rit;
     // Dev address.
     address public devaddr;
-    // Operation address.
-    address public operationaddr;
-    // Fund address.
-    address public fundaddr;
-    // institution address.
-    address public institutionaddr;
-    // Block number when bonus RIT period ends.
-    uint256 public bonusEndBlock;
+    // Fee address.
+    address public feeaddr;
     // RIT tokens created per block.
     uint256 public RITPerBlock;
     // Bonus muliplier for early RIT makers.
@@ -73,8 +69,6 @@ contract SinglePool is Ownable {
     mapping (uint256 => mapping (address => URITInfo)) public uRITInfo;
     // Total allocation poitns. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
-    // The block number when RIT mining starts.
-    uint256 public startBlock;
     uint256 public fee = 1; // 1% of profit
     uint256 public feeBase = 100; // 1% of profit
 
@@ -82,19 +76,20 @@ contract SinglePool is Ownable {
     event Withdraw(address indexed uRIT, uint256 indexed pid, uint256 amount,uint256 rewardLp);
     event ReInvest(uint256 indexed pid);
     event SetDev(address indexed devAddress);
+    event SetFee(address indexed feeAddress);
     event SetRITPerBlock(uint256 _RITPerBlock);
     event SetPool(uint256 pid ,address lpaddr,uint256 point,uint256 min,uint256 max);
     constructor(
         Common _rit,
+        address _feeaddr,
         address _devaddr,
         uint256 _RITPerBlock,
         IUniswapV2Router02 _router
     ) public {
         rit = _rit;
         devaddr = _devaddr;
+        feeaddr = _feeaddr;
         RITPerBlock = _RITPerBlock;
-        bonusEndBlock = 1;
-        startBlock = 0;
         router = _router;
     }
 
@@ -125,11 +120,11 @@ contract SinglePool is Ownable {
 
     // Add a new lp to the pool. Can only be called by the owner.
     // XXX DO NOT add the same LP token more than once. Rewards will be messed up if you do.
-    function add(IWepiggy _kswap,uint256 _allocPoint, IERC20 _lpToken, bool _withUpdate,uint256 _min,uint256 _max,IERC20 _rewardToken) public onlyOwner {
+    function add(IWepiggy _kswap,uint256 _allocPoint, IERC20 _lpToken, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,IERC20 _rewardToken) public onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
         }
-        uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
+        uint256 lastRewardBlock = block.number;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
         poolInfo.push(PoolInfo({
             kswap: _kswap,
@@ -142,14 +137,16 @@ contract SinglePool is Ownable {
             rewardToken:_rewardToken,
             rewardLpAmount:0,
             lpSupply:0,
-            accLpPerShare:0 // 利润分配
+            accLpPerShare:0, // 利润分配
+            deposit_fee:_deposit_fee,
+            withdraw_fee:_withdraw_fee
         }));
         approve(poolInfo[poolInfo.length-1]);
         emit SetPool(poolInfo.length-1 , address(_lpToken), _allocPoint, _min, _max);
     }
 
     // Update the given pool's RIT allocation point. Can only be called by the owner.
-    function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate,uint256 _min,uint256 _max,IERC20 _rewardToken) public onlyOwner {
+    function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,IERC20 _rewardToken) public onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
         }
@@ -158,6 +155,8 @@ contract SinglePool is Ownable {
         poolInfo[_pid].minAMount = _min;
         poolInfo[_pid].maxAMount = _max;
         poolInfo[_pid].rewardToken = _rewardToken;
+        poolInfo[_pid].deposit_fee = _deposit_fee;
+        poolInfo[_pid].withdraw_fee = _withdraw_fee;
         emit SetPool(_pid , address(poolInfo[_pid].lpToken), _allocPoint, _min, _max);
     }
 
@@ -264,6 +263,11 @@ contract SinglePool is Ownable {
         }
         if(_amount > 0) { // 
             // 先将金额抵押到合约
+            if(pool.deposit_fee > 0){
+                uint256 feeR = _amount.mul(pool.deposit_fee).div(10000);
+                pool.lpToken.safeTransferFrom(address(msg.sender), devaddr, feeR);
+                _amount = _amount.sub(feeR);
+            }
             pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
             pool.kswap.mint(_amount);
             uRIT.amount = uRIT.amount.add(_amount);
@@ -307,6 +311,11 @@ contract SinglePool is Ownable {
             calcProfit(_pid,pool,fene); // 计算利息
             uint256 rewardLp = uRIT.amount.mul(pool.accLpPerShare).div(1e12).sub(uRIT.rewardLpDebt);
             uRIT.amount = uRIT.amount.sub(_amount);
+            if(pool.withdraw_fee>0){
+                uint256 fee = _amount.mul(pool.withdraw_fee).div(10000);      
+                _amount = _amount.sub(fee);
+                pool.lpToken.safeTransfer(devaddr, fee);
+            }
             // 利息+要退出的本金一起退出
             uint256 withdraw_amount = _amount.add(rewardLp);
             uint256 shouldFene = withdraw_amount.mul(fene).div(pool.lpSupply);
@@ -339,7 +348,7 @@ contract SinglePool is Ownable {
         uint256 ba = pool.rewardToken.balanceOf(address(this));
         if(ba > 0){
             uint256 profitFee = ba.mul(fee).div(feeBase);
-            pool.rewardToken.safeTransfer(devaddr,profitFee);
+            pool.rewardToken.safeTransfer(feeaddr,profitFee);
             ba = ba.sub(profitFee);
             // 剩余换成本币当利息
             address[] memory path = new address[](2);
@@ -389,5 +398,13 @@ contract SinglePool is Ownable {
         require(_devaddr != address(0), "_devaddr is address(0)");
         devaddr = _devaddr;
         emit SetDev(_devaddr);
+    }
+
+    // Update fee address by the previous dev.
+    function setFee(address _feeaddr) public {
+        require(msg.sender == feeaddr, "fee: wut?");
+        require(_feeaddr != address(0), "_feeaddr is address(0)");
+        feeaddr = _feeaddr;
+        emit SetFee(_feeaddr);
     }
 }
