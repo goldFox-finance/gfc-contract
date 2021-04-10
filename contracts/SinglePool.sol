@@ -1,7 +1,7 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 import "./interface/iwepiggy.sol";
-import "./Common.sol";
+import "./Third.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
@@ -14,7 +14,7 @@ import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 // distributed and the community can show to govern itself.
 //
 // Have fun reading it. Hopefully it's bug-free. God bless.
-contract SinglePool is Ownable {
+contract SinglePool is Third {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     IUniswapV2Router02 router;
@@ -52,6 +52,7 @@ contract SinglePool is Ownable {
         uint256 deposit_fee; // 1/10000
         uint256 withdraw_fee; // 1/10000
     }
+    uint256 public baseReward = 0;
     // The RIT TOKEN!
     Common public rit;
     // Dev address.
@@ -79,6 +80,7 @@ contract SinglePool is Ownable {
     event SetFee(address indexed feeAddress);
     event SetRITPerBlock(uint256 _RITPerBlock);
     event SetPool(uint256 pid ,address lpaddr,uint256 point,uint256 min,uint256 max);
+    event CalProfit(uint256 pid ,uint256 allBalance,uint256 lpSupply,uint256 lpReward);
     constructor(
         Common _rit,
         address _feeaddr,
@@ -95,6 +97,10 @@ contract SinglePool is Ownable {
 
     function poolLength() external view returns (uint256) {
         return poolInfo.length;
+    }
+
+    function setBaseReward(uint256 _base) public onlyOwner {
+        baseReward = _base;
     }
 
     function setRITPerBlock(uint256 _RITPerBlock) public onlyOwner {
@@ -218,16 +224,13 @@ contract SinglePool is Ownable {
     // add reward variables of the given pool to be up-to-date.
     function updatePoolProfit(uint256 _pid,uint256 _amount,bool isAdd) public {
         PoolInfo storage pool = poolInfo[_pid];
-        if (block.number <= pool.lastRewardBlock) {
-            return;
-        }
         
         pool.rewardLpAmount = isAdd ? pool.rewardLpAmount.add(_amount) : pool.rewardLpAmount.sub(_amount);
-        if (pool.rewardLpAmount == 0 || pool.lpSupply == 0) {
-            pool.lastRewardBlock = block.number;
+        if (pool.lpSupply == 0) {
             return;
         }
-        pool.accLpPerShare = pool.accLpPerShare.add(pool.rewardLpAmount.mul(1e12).div(pool.lpSupply));
+        _amount = _amount.mul(9999).div(10000);
+        pool.accLpPerShare = pool.accLpPerShare.add(_amount.mul(1e12).div(pool.lpSupply));
     }
 
     function testdeposit(uint256 _pid, uint256 _amount) public onlyOwner{
@@ -255,11 +258,9 @@ contract SinglePool is Ownable {
         uint256 fene = pool.kswap.balanceOf(address(this));
         calcProfit(_pid,pool,fene); // 计算利息
         futou(pool);// 复投
-        if (uRIT.amount > 0) {
-            uint256 pendingT = uRIT.amount.mul(pool.accRITPerShare).div(1e12).sub(uRIT.rewardDebt);
-            if(pendingT > 0) {
-                safeRITTransfer(msg.sender, pendingT);
-            }
+        uint256 pendingT = uRIT.amount.mul(pool.accRITPerShare).div(1e12).sub(uRIT.rewardDebt);
+        if(pendingT > 0) {
+            safeRITTransfer(msg.sender, pendingT);
         }
         if(_amount > 0) { // 
             // 先将金额抵押到合约
@@ -279,10 +280,10 @@ contract SinglePool is Ownable {
                 revert("amount is too high");
             }
             pool.lpSupply = pool.lpSupply.add(_amount);
-            pool.rewardLpAmount = pool.rewardLpAmount.add(0);
+            // pool.rewardLpAmount = pool.rewardLpAmount.add(0);
         }
+        uRIT.rewardLpDebt = uRIT.rewardLpDebt.add(_amount.mul(pool.accLpPerShare).div(1e12));
         uRIT.rewardDebt = uRIT.amount.mul(pool.accRITPerShare).div(1e12);
-        uRIT.rewardLpDebt = uRIT.amount.mul(pool.accLpPerShare).div(1e12);
         emit Deposit(msg.sender, _pid, _amount);
     }
 
@@ -298,7 +299,6 @@ contract SinglePool is Ownable {
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
         require(uRIT.amount >= _amount, "withdraw: not good");
         updatePool(_pid, 0, false);
-        updatePoolProfit(_pid, 0, false);
         uint256 pendingT = uRIT.amount.mul(pool.accRITPerShare).div(1e12).sub(uRIT.rewardDebt);
         if(pendingT > 0) {
             safeRITTransfer(msg.sender, pendingT);
@@ -318,23 +318,22 @@ contract SinglePool is Ownable {
             }
             // 利息+要退出的本金一起退出
             uint256 withdraw_amount = _amount.add(rewardLp);
-            uint256 shouldFene = withdraw_amount.mul(fene).div(pool.lpSupply);
-            pool.kswap.redeem(shouldFene); // 提出本金与应有利息
-            safeLpTransfer(pool,address(msg.sender), withdraw_amount);
-            futou(pool);
+
+            safeLpTransfer(pool,address(msg.sender), withdraw_amount,_amount);
             pool.lpSupply = pool.lpSupply.sub(_amount);
-            pool.rewardLpAmount = pool.rewardLpAmount.sub(rewardLp);
+            futou(pool); //剩余复投
+            pool.rewardLpAmount = pool.lpSupply > 0 ? pool.rewardLpAmount.sub(rewardLp) : 0;
+            uRIT.rewardLpDebt = uRIT.amount.mul(pool.accLpPerShare).div(1e12);
+        } else{
+            updatePoolProfit(_pid, 0, false);
         }
         uRIT.rewardDebt = uRIT.amount.mul(pool.accRITPerShare).div(1e12);
-        uRIT.rewardLpDebt = uRIT.amount.mul(pool.accLpPerShare).div(1e12);
         emit Withdraw(msg.sender, _pid, _amount,pool.rewardLpAmount);
     }
 
-    function safeLpTransfer(PoolInfo memory pool,address _to, uint256 _amount) internal {
+    function safeLpTransfer(PoolInfo memory pool,address _to, uint256 _amount,uint256 _min) internal {
         uint256 RITBal = pool.lpToken.balanceOf(address(this));
-        if(RITBal<=0){
-            return;
-        }
+        require(RITBal>=_amount,"wait other platform!!!");
         if (_amount > RITBal) {
             pool.lpToken.transfer(_to, RITBal);
         } else {
@@ -344,6 +343,8 @@ contract SinglePool is Ownable {
 
     // 计算利息
     function calcProfit(uint256 pid,PoolInfo memory pool,uint256 fene) private{
+        // 计算总的利息
+        pool.kswap.redeem(fene);
         // pool.kswap.claim(); // 提出利息
         uint256 ba = pool.rewardToken.balanceOf(address(this));
         if(ba > 0){
@@ -356,17 +357,20 @@ contract SinglePool is Ownable {
             path[1] = address(pool.lpToken);
             router.swapExactTokensForTokens(ba, uint256(0), path, address(this), block.timestamp.add(1800));
         }
-        // 计算总的利息
-        pool.kswap.redeem(fene);
         uint256 allBalance = pool.lpToken.balanceOf(address(this));
-        if( allBalance > pool.lpSupply){
-            updatePoolProfit(pid, allBalance.sub(pool.lpSupply), true);
+        if( allBalance > pool.lpSupply.add(pool.rewardLpAmount)){ // 计算出增量的 利息
+            updatePoolProfit(pid, allBalance.sub(pool.lpSupply).sub(pool.rewardLpAmount), true);
         }
     }
 
     function futou(PoolInfo memory pool) private {
         uint256 ba = pool.lpToken.balanceOf(address(this));
         if(ba<=0){
+            return;
+        }
+        if(pool.lpSupply<=0){
+            // 如果当前池子质押总额为0 那么多余的反给平台
+            pool.lpToken.transfer(feeaddr,ba);
             return;
         }
         // LP利息复投

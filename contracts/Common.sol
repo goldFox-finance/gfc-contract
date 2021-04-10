@@ -4,7 +4,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interface/ERC677.sol";
 
 // OFIToken with Governance.
-contract Common is ERC677("OFI.CASH", "OFI"),Ownable {
+contract Common is ERC677("ANTFarm", "ANT"),Ownable {
     mapping(address =>uint256) public miners;
     /**
      * @dev See {ERC20-_mint}.

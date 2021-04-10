@@ -1,6 +1,6 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
-import "./interface/iukswap.sol";
+import "./interface/ivenus.sol";
 import "./Third.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
@@ -14,10 +14,10 @@ import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 // distributed and the community can show to govern itself.
 //
 // Have fun reading it. Hopefully it's bug-free. God bless.
-contract UKSwapPool is Third {
+contract BscSinglePool is Third {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
-    IUniswapV2Router02 router;
+    IUniswapV2Router02 public router;
     // Info of each uRIT.
     struct URITInfo {
         uint256 amount;     // How many LP tokens the uRIT has provided.
@@ -38,30 +38,27 @@ contract UKSwapPool is Third {
 
     // Info of each pool.
     struct PoolInfo {
-        IUKswap kswap;           // Address of LP token contract.
+        IVenus kswap;           // Address of LP token contract.
         IERC20 lpToken;           // Address of LP token contract.
         uint256 allocPoint;       // How many allocation points assigned to this pool. RITs to distribute per block.
         uint256 lastRewardBlock;  // Last block number that RITs distribution occurs.
         uint256 accRITPerShare; // Accumulated RITs per share, times 1e12. See below.
         uint256 minAMount;
         uint256 maxAMount;
-        ERC20 rewardToken;
+        IERC20 rewardToken;
         uint256 rewardLpAmount;
         uint256 lpSupply;
         uint256 accLpPerShare; // 利润分配
+        uint256 deposit_fee; // 1/10000
+        uint256 withdraw_fee; // 1/10000
     }
+    uint256 public baseReward = 0;
     // The RIT TOKEN!
     Common public rit;
     // Dev address.
     address public devaddr;
-    // Operation address.
-    address public operationaddr;
-    // Fund address.
-    address public fundaddr;
-    // institution address.
-    address public institutionaddr;
-    // Block number when bonus RIT period ends.
-    uint256 public bonusEndBlock;
+    // Fee address.
+    address public feeaddr;
     // RIT tokens created per block.
     uint256 public RITPerBlock;
     // Bonus muliplier for early RIT makers.
@@ -73,8 +70,6 @@ contract UKSwapPool is Third {
     mapping (uint256 => mapping (address => URITInfo)) public uRITInfo;
     // Total allocation poitns. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
-    // The block number when RIT mining starts.
-    uint256 public startBlock;
     uint256 public fee = 1; // 1% of profit
     uint256 public feeBase = 100; // 1% of profit
 
@@ -82,24 +77,29 @@ contract UKSwapPool is Third {
     event Withdraw(address indexed uRIT, uint256 indexed pid, uint256 amount,uint256 rewardLp);
     event ReInvest(uint256 indexed pid);
     event SetDev(address indexed devAddress);
+    event SetFee(address indexed feeAddress);
     event SetRITPerBlock(uint256 _RITPerBlock);
     event SetPool(uint256 pid ,address lpaddr,uint256 point,uint256 min,uint256 max);
     constructor(
         Common _rit,
+        address _feeaddr,
         address _devaddr,
         uint256 _RITPerBlock,
         IUniswapV2Router02 _router
     ) public {
         rit = _rit;
         devaddr = _devaddr;
+        feeaddr = _feeaddr;
         RITPerBlock = _RITPerBlock;
-        bonusEndBlock = 1;
-        startBlock = 0;
         router = _router;
     }
 
     function poolLength() external view returns (uint256) {
         return poolInfo.length;
+    }
+
+    function setBaseReward(uint256 _base) public onlyOwner {
+        baseReward = _base;
     }
 
     function setRITPerBlock(uint256 _RITPerBlock) public onlyOwner {
@@ -125,11 +125,11 @@ contract UKSwapPool is Third {
 
     // Add a new lp to the pool. Can only be called by the owner.
     // XXX DO NOT add the same LP token more than once. Rewards will be messed up if you do.
-    function add(IUKswap _kswap,uint256 _allocPoint, IERC20 _lpToken, bool _withUpdate,uint256 _min,uint256 _max,ERC20 _rewardToken) public onlyOwner {
+    function add(IVenus _kswap,uint256 _allocPoint, IERC20 _lpToken, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,IERC20 _rewardToken) public onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
         }
-        uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
+        uint256 lastRewardBlock = block.number;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
         poolInfo.push(PoolInfo({
             kswap: _kswap,
@@ -142,14 +142,16 @@ contract UKSwapPool is Third {
             rewardToken:_rewardToken,
             rewardLpAmount:0,
             lpSupply:0,
-            accLpPerShare:0 // 利润分配
+            accLpPerShare:0, // 利润分配
+            deposit_fee:_deposit_fee,
+            withdraw_fee:_withdraw_fee
         }));
         approve(poolInfo[poolInfo.length-1]);
         emit SetPool(poolInfo.length-1 , address(_lpToken), _allocPoint, _min, _max);
     }
 
     // Update the given pool's RIT allocation point. Can only be called by the owner.
-    function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate,uint256 _min,uint256 _max) public onlyOwner {
+    function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,IERC20 _rewardToken) public onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
         }
@@ -157,6 +159,9 @@ contract UKSwapPool is Third {
         poolInfo[_pid].allocPoint = _allocPoint;
         poolInfo[_pid].minAMount = _min;
         poolInfo[_pid].maxAMount = _max;
+        poolInfo[_pid].rewardToken = _rewardToken;
+        poolInfo[_pid].deposit_fee = _deposit_fee;
+        poolInfo[_pid].withdraw_fee = _withdraw_fee;
         emit SetPool(_pid , address(poolInfo[_pid].lpToken), _allocPoint, _min, _max);
     }
 
@@ -171,7 +176,7 @@ contract UKSwapPool is Third {
         URITInfo storage uRIT = uRITInfo[_pid][_uRIT];
         uint256 accRITPerShare = pool.accRITPerShare;
         uint256 lpSupply = pool.lpSupply;
-        if (block.number > pool.lastRewardBlock && lpSupply != 0) {
+        if (block.number > pool.lastRewardBlock && lpSupply > 0) {
             uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
             uint256 RITReward = multiplier.mul(RITPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
             accRITPerShare = accRITPerShare.add(RITReward.mul(1e12).div(lpSupply));
@@ -218,17 +223,13 @@ contract UKSwapPool is Third {
     // add reward variables of the given pool to be up-to-date.
     function updatePoolProfit(uint256 _pid,uint256 _amount,bool isAdd) public {
         PoolInfo storage pool = poolInfo[_pid];
-        if (block.number <= pool.lastRewardBlock) {
-            return;
-        }
-        uint256 lpProfit = isAdd ? pool.rewardLpAmount.add(_amount) : pool.rewardLpAmount.sub(_amount);
         
-        pool.rewardLpAmount = lpProfit;
-        if (lpProfit == 0 || pool.lpSupply == 0) {
-            pool.lastRewardBlock = block.number;
+        pool.rewardLpAmount = isAdd ? pool.rewardLpAmount.add(_amount) : pool.rewardLpAmount.sub(_amount);
+        if (pool.lpSupply == 0) {
             return;
         }
-        pool.accLpPerShare = pool.accLpPerShare.add(lpProfit.mul(1e12).div(pool.lpSupply));
+        _amount = _amount.mul(9999).div(10000);
+        pool.accLpPerShare = pool.accLpPerShare.add(_amount.mul(1e12).div(pool.lpSupply));
     }
 
     function testdeposit(uint256 _pid, uint256 _amount) public onlyOwner{
@@ -238,15 +239,12 @@ contract UKSwapPool is Third {
         if (allowAmount<_amount){
             pool.lpToken.approve(address(pool.kswap), uint256(-1));
         }
-        pool.kswap.stake(_amount);
+        pool.kswap.mint(_amount);
     }
 
     function approve(PoolInfo memory pool) private {
         pool.rewardToken.approve(address(router),uint256(-1));
-        address token0 = IUniswapV2Pair(address(pool.lpToken)).token0();
-        address token1 = IUniswapV2Pair(address(pool.lpToken)).token1();
-        IERC20(token0).approve(address(router),uint256(-1));
-        IERC20(token1).approve(address(router),uint256(-1));
+        pool.rewardToken.approve(address(pool.kswap),uint256(-1));
         pool.lpToken.approve(address(pool.kswap), uint256(-1));
     }
 
@@ -254,17 +252,22 @@ contract UKSwapPool is Third {
     function deposit(uint256 _pid, uint256 _amount) public {
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
-        updatePool(_pid, 0, true);
-        calcProfit(_pid,pool,false); // 计算利息
-        futou(pool); // 剩余利息进行复投
+        
+        updatePool(_pid, 0, true); 
+        harvest(_pid);// 复投
         uint256 pendingT = uRIT.amount.mul(pool.accRITPerShare).div(1e12).sub(uRIT.rewardDebt);
         if(pendingT > 0) {
             safeRITTransfer(msg.sender, pendingT);
         }
         if(_amount > 0) { // 
             // 先将金额抵押到合约
+            if(pool.deposit_fee > 0){
+                uint256 feeR = _amount.mul(pool.deposit_fee).div(10000);
+                pool.lpToken.safeTransferFrom(address(msg.sender), devaddr, feeR);
+                _amount = _amount.sub(feeR);
+            }
             pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
-            pool.kswap.stake(_amount);
+            pool.kswap.mint(_amount);
             uRIT.amount = uRIT.amount.add(_amount);
 
             if (pool.minAMount > 0 && uRIT.amount < pool.minAMount){
@@ -273,18 +276,18 @@ contract UKSwapPool is Third {
             if (pool.maxAMount > 0 && uRIT.amount > pool.maxAMount){
                 revert("amount is too high");
             }
-            pool.lpSupply.add(_amount);
-            pool.rewardLpAmount.add(0);
+            pool.lpSupply = pool.lpSupply.add(_amount);
+            pool.rewardLpAmount = pool.rewardLpAmount.add(0);
         }
+        uRIT.rewardLpDebt = uRIT.rewardLpDebt.add(_amount.mul(pool.accLpPerShare).div(1e12));
         uRIT.rewardDebt = uRIT.amount.mul(pool.accRITPerShare).div(1e12);
-        uRIT.rewardLpDebt = _amount.mul(pool.accLpPerShare).div(1e12);
         emit Deposit(msg.sender, _pid, _amount);
     }
 
-    function testwithdraw(uint256 _pid, uint256 _amount) public onlyOwner{
+    function testwithdraw(uint256 _pid) public onlyOwner{
         PoolInfo storage pool = poolInfo[_pid];
-        pool.kswap.withdraw(_amount);
-        pool.lpToken.safeTransfer(address(msg.sender), _amount);
+        pool.kswap.redeem(pool.kswap.balanceOf(address(this)));
+        pool.lpToken.safeTransfer(address(msg.sender), pool.lpToken.balanceOf(address(this)));
     }
 
     // Withdraw LP tokens from MasterChef.
@@ -293,35 +296,41 @@ contract UKSwapPool is Third {
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
         require(uRIT.amount >= _amount, "withdraw: not good");
         updatePool(_pid, 0, false);
-        updatePoolProfit(_pid, 0, false);
         uint256 pendingT = uRIT.amount.mul(pool.accRITPerShare).div(1e12).sub(uRIT.rewardDebt);
         if(pendingT > 0) {
             safeRITTransfer(msg.sender, pendingT);
         }
-        uint256 rewardLp = 0;
         if(_amount > 0) {
-            pool.kswap.getReward(); // 提出利息
-            calcProfit(_pid,pool,false); // 计算利息
-            rewardLp = uRIT.amount.mul(pool.accLpPerShare).div(1e12).sub(uRIT.rewardLpDebt);
+            // 算出总金额
+            // 利息复投计算
+            // pool.kswap.claim(); // 提出利息
+            uint256 fene = pool.kswap.balanceOf(address(this));
+            calcProfit(_pid,pool,fene); // 计算利息
+            uint256 rewardLp = uRIT.amount.mul(pool.accLpPerShare).div(1e12).sub(uRIT.rewardLpDebt);
             uRIT.amount = uRIT.amount.sub(_amount);
+            if(pool.withdraw_fee>0){
+                uint256 fee = _amount.mul(pool.withdraw_fee).div(10000);      
+                _amount = _amount.sub(fee);
+                pool.lpToken.safeTransfer(devaddr, fee);
+            }
             // 利息+要退出的本金一起退出
             uint256 withdraw_amount = _amount.add(rewardLp);
-            pool.kswap.withdraw(withdraw_amount); // 提出本金与应有利息
-            safeLpTransfer(pool,address(msg.sender), withdraw_amount);
-            futou(pool); // 剩余利息进行复投
+
+            safeLpTransfer(pool,address(msg.sender), withdraw_amount,_amount);
             pool.lpSupply = pool.lpSupply.sub(_amount);
-            pool.rewardLpAmount = pool.rewardLpAmount.sub(rewardLp);
+            futou(pool); //剩余复投
+            pool.rewardLpAmount = pool.lpSupply > 0 ? pool.rewardLpAmount.sub(rewardLp) : 0;
             uRIT.rewardLpDebt = uRIT.amount.mul(pool.accLpPerShare).div(1e12);
+        } else{
+            updatePoolProfit(_pid, 0, false);
         }
         uRIT.rewardDebt = uRIT.amount.mul(pool.accRITPerShare).div(1e12);
-        emit Withdraw(msg.sender, _pid, _amount,rewardLp);
+        emit Withdraw(msg.sender, _pid, _amount,pool.rewardLpAmount);
     }
 
-    function safeLpTransfer(PoolInfo memory pool,address _to, uint256 _amount) internal {
+    function safeLpTransfer(PoolInfo memory pool,address _to, uint256 _amount,uint256 _min) internal {
         uint256 RITBal = pool.lpToken.balanceOf(address(this));
-        if(RITBal<=0){
-            return;
-        }
+        require(RITBal>=_amount,"wait other platform!!!");
         if (_amount > RITBal) {
             pool.lpToken.transfer(_to, RITBal);
         } else {
@@ -330,66 +339,25 @@ contract UKSwapPool is Third {
     }
 
     // 计算利息
-    function calcProfit(uint256 pid,PoolInfo memory pool,bool autoi) private{
+    function calcProfit(uint256 pid,PoolInfo memory pool,uint256 fene) private{
+        // 计算总的利息
+        pool.kswap.redeem(fene);
         uint256 ba = pool.rewardToken.balanceOf(address(this));
-        if(ba<=0){
-            return;
+      
+        if(ba > 0){
+            // pool.rewardToken.transfer(devaddr,ba);
+            uint256 profitFee = ba.mul(fee).div(feeBase);
+            pool.rewardToken.safeTransfer(feeaddr,profitFee);
+            ba = ba.sub(profitFee);
+            address[] memory path = new address[](2);
+            path[0] = address(pool.rewardToken); 
+            path[1] = address(pool.lpToken);
+            router.swapExactTokensForTokens(ba, uint256(0), path, address(this), block.timestamp.add(1800));
         }
-        // 手续费
-        uint256 profitFee = ba.mul(fee).div(feeBase);
-        pool.rewardToken.transfer(devaddr,profitFee);
-        ba = ba.sub(profitFee);
-        uint256 half = ba.div(2);
-        ba = ba.sub(half);
-        // 其余换成LP
-        // 一半购买 token0 
-        address token0 = IUniswapV2Pair(address(pool.lpToken)).token0();
-        address[] memory path = new address[](2);
-        path[0] = address(pool.rewardToken);
-        path[1] = token0;
-        router.swapExactTokensForTokens(half, uint256(0), path, address(this), block.timestamp.add(1800));
-        // 一半购买 token1
-        address token1 = IUniswapV2Pair(address(pool.lpToken)).token1();
-        path[1] = token1;
-        router.swapExactTokensForTokens(ba, uint256(0), path, address(this), block.timestamp.add(1800));
-        // 添加流动性
-        (uint256 t0,uint256 t1,) = IUniswapV2Pair(address(pool.lpToken)).getReserves();
-        if( t0<=0 || t1<=0 ){ // 没有流动性
-            return;
+        uint256 allBalance = pool.lpToken.balanceOf(address(this));
+        if( allBalance > pool.lpSupply.add(pool.rewardLpAmount)){ // 计算出增量的 利息
+            updatePoolProfit(pid, allBalance.sub(pool.lpSupply).sub(pool.rewardLpAmount), true);
         }
-        uint256 token0Ba = IERC20(token0).balanceOf(address(this));
-        uint256 token1Ba = IERC20(token1).balanceOf(address(this));
-        if( token0Ba <= 0 || token1Ba <= 0 ){ // 没有余额
-            return;
-        }
-        uint256 out = 0;
-        uint256 liqui = 0;
-        if (t0.mul(1e10).div(t1)>token0Ba.mul(1e10).div(token1Ba)){
-            // 说明 token1Ba 偏多
-            out = token0Ba.mul(t1).div(t0); 
-            (,,liqui) = router.addLiquidity(token0, token1, token0Ba, out, 1, 1, address(this), block.timestamp.add(1800));
-            if(autoi){
-                token1Ba = token1Ba.sub(out);
-                if (token1Ba>0){
-                    path[0] = token1;
-                    path[1] = address(pool.rewardToken); // 剩余换回奖励的Token 下次使用
-                    router.swapExactTokensForTokens(token1Ba, 0, path, address(this), block.timestamp.add(1800));
-                }
-            }
-           
-        } else{ // 说明token0Ba 偏多
-            out = token1Ba.mul(t0).div(t1);
-            (,,liqui) = router.addLiquidity(token0, token1, out, token1Ba, 1, 1, address(this), block.timestamp.add(1800));
-            if(autoi){
-                token0Ba = token0Ba.sub(out);
-                if (token0Ba>0){
-                    path[0] = token0;
-                    path[1] = address(pool.rewardToken); // 剩余换回奖励的Token 下次使用
-                    router.swapExactTokensForTokens(token0Ba, 0, path, address(this), block.timestamp.add(1800));
-                }
-            }
-        }
-        updatePoolProfit(pid, liqui, true);
     }
 
     function futou(PoolInfo memory pool) private {
@@ -397,15 +365,21 @@ contract UKSwapPool is Third {
         if(ba<=0){
             return;
         }
-        pool.kswap.stake(ba); // LP利息复投
+        if(pool.lpSupply<=0){
+            // 如果当前池子质押总额为0 那么多余的反给平台
+            pool.lpToken.transfer(feeaddr,ba);
+            return;
+        }
+        // LP利息复投
+        pool.kswap.mint(ba);
     }
 
     // auto reinvest
     function harvest(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
-        pool.kswap.getReward(); // 提取利息
-        calcProfit(_pid, pool,true); // 计算利息
-        futou(pool); // 进行复投
+        uint256 fene = pool.kswap.balanceOf(address(this));
+        calcProfit(_pid, pool,fene); // 计算利息 
+        futou(pool); // 并复投
         emit ReInvest(_pid);
     }
 
@@ -425,5 +399,13 @@ contract UKSwapPool is Third {
         require(_devaddr != address(0), "_devaddr is address(0)");
         devaddr = _devaddr;
         emit SetDev(_devaddr);
+    }
+
+    // Update fee address by the previous dev.
+    function setFee(address _feeaddr) public {
+        require(msg.sender == feeaddr, "fee: wut?");
+        require(_feeaddr != address(0), "_feeaddr is address(0)");
+        feeaddr = _feeaddr;
+        emit SetFee(_feeaddr);
     }
 }

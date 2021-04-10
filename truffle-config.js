@@ -68,8 +68,37 @@ module.exports = {
       //HDWalletProvider.pollingInterval = 25000 ms, default is 4000
       //truffle.deploymentPollingInterval = 25000 ms, default is 4000
       provider: () => new HDWalletProvider(privKeys, `https://exchaintest.okexcn.com`),
+      // provider: function () {
+      //   var wallet = new HDWalletProvider(privKeys, 'https://exchaintest.okexcn.com')
+      //   var nonceTracker = new NonceTrackerSubprovider()
+      //   wallet.engine._providers.unshift(nonceTracker)
+      //   nonceTracker.setEngine(wallet.engine)
+      //   return wallet
+      // },
       network_id: 65,       // Ropsten's id
       from: "0x6666567B3358A89C23caD4517A8748e3aaaBD061",
+      gas: 8000000,        // Ropsten has a lower block limit than mainnet
+      // gasPrice: 2000000000, // 2 gwei
+      websockets: true, // (default: false)
+      confirmations: 0, // (default: 0)
+      timeoutBlocks: 50000,  // # of blocks before a deployment times out  (minimum/default: 50)
+      deploymentPollingInterval: 25000,
+      skipDryRun: false // Skip dry run before migrations? (default: false for public nets )
+    },
+    bsc: {
+      // provider: () => new HDWalletProvider(mnemonic, `https://rinkeby-light.eth.linkpool.io`),
+      //HDWalletProvider.pollingInterval = 25000 ms, default is 4000
+      //truffle.deploymentPollingInterval = 25000 ms, default is 4000
+      provider: () => new HDWalletProvider(privKeys, `https://bsc-dataseed.binance.org/`),
+      // provider: function () {
+      //   var wallet = new HDWalletProvider(privKeys, 'https://exchaintest.okexcn.com')
+      //   var nonceTracker = new NonceTrackerSubprovider()
+      //   wallet.engine._providers.unshift(nonceTracker)
+      //   nonceTracker.setEngine(wallet.engine)
+      //   return wallet
+      // },
+      network_id: 56,       // Ropsten's id
+      from: "0xAe432BE66D4f96a6c52b568A3427547D27d82c08",
       gas: 8000000,        // Ropsten has a lower block limit than mainnet
       // gasPrice: 2000000000, // 2 gwei
       websockets: true, // (default: false)
@@ -82,8 +111,8 @@ module.exports = {
       provider: () => new HDWalletProvider(privKeys, `https://http-mainnet.hecochain.com`),
       network_id: 128,       // mainnet's id
       gas: 12000000,        // 
-      from: "0x7df8F9eb8C1b63494290b4ED5aFe29BF092439a7",
-      // gasPrice: 100000000000, // 100 gwei
+      from: "0xdd1Fd9108783A904692Ccf36748f36881811868b",
+      gasPrice: 2000000000, // 2 gwei
       confirmations: 0,    // # of confs to wait between deployments. (default: 0)
       timeoutBlocks: 200,  // # of blocks before a deployment times out  (minimum/default: 50)
       deploymentPollingInterval: 25000,
