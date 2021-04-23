@@ -52,6 +52,7 @@ contract BscReInvestPool is Third {
         uint256 accLpPerShare; // 利润分配
         uint256 deposit_fee; // 1/10000
         uint256 withdraw_fee; // 1/10000
+        uint256 allLpReward
     }
     uint256 public baseReward = 100000000;
     ICake public kswap;
@@ -148,7 +149,8 @@ contract BscReInvestPool is Third {
             lpSupply:0,
             accLpPerShare:0, // 利润分配
             deposit_fee:_deposit_fee,
-            withdraw_fee:_withdraw_fee
+            withdraw_fee:_withdraw_fee,
+            allLpReward:0
         }));
         // 一次性授权
         approve(poolInfo[poolInfo.length-1]);
@@ -227,6 +229,9 @@ contract BscReInvestPool is Third {
     // add reward variables of the given pool to be up-to-date.
     function updatePoolProfit(uint256 _pid,uint256 _amount,bool isAdd) public {
         PoolInfo storage pool = poolInfo[_pid];
+        if (isAdd){
+            pool.allLpReward = pool.allLpReward.add(_amount);
+        }
         pool.rewardLpAmount = isAdd ? pool.rewardLpAmount.add(_amount) : pool.rewardLpAmount.sub(_amount);
         if (pool.lpSupply == 0) {
             return;

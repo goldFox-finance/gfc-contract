@@ -70,8 +70,8 @@ contract SinglePool is Third {
     mapping (uint256 => mapping (address => URITInfo)) public uRITInfo;
     // Total allocation poitns. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
-    uint256 public fee = 1; // 1% of profit
-    uint256 public feeBase = 100; // 1% of profit
+    uint256 public fee = 1; // 1% of prCBAYt
+    uint256 public feeBase = 100; // 1% of prCBAYt
 
     event Deposit(address indexed uRIT, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed uRIT, uint256 indexed pid, uint256 amount,uint256 rewardLp);
@@ -80,7 +80,7 @@ contract SinglePool is Third {
     event SetFee(address indexed feeAddress);
     event SetRITPerBlock(uint256 _RITPerBlock);
     event SetPool(uint256 pid ,address lpaddr,uint256 point,uint256 min,uint256 max);
-    event CalProfit(uint256 pid ,uint256 allBalance,uint256 lpSupply,uint256 lpReward);
+    event CalPrCBAYt(uint256 pid ,uint256 allBalance,uint256 lpSupply,uint256 lpReward);
     constructor(
         Common _rit,
         address _feeaddr,
@@ -222,7 +222,7 @@ contract SinglePool is Third {
     }
 
     // add reward variables of the given pool to be up-to-date.
-    function updatePoolProfit(uint256 _pid,uint256 _amount,bool isAdd) public {
+    function updatePoolPrCBAYt(uint256 _pid,uint256 _amount,bool isAdd) public {
         PoolInfo storage pool = poolInfo[_pid];
         
         pool.rewardLpAmount = isAdd ? pool.rewardLpAmount.add(_amount) : pool.rewardLpAmount.sub(_amount);
@@ -256,7 +256,7 @@ contract SinglePool is Third {
         
         updatePool(_pid, 0, true); 
         uint256 fene = pool.kswap.balanceOf(address(this));
-        calcProfit(_pid,pool,fene); // 计算利息
+        calcPrCBAYt(_pid,pool,fene); // 计算利息
         futou(pool);// 复投
         uint256 pendingT = uRIT.amount.mul(pool.accRITPerShare).div(1e12).sub(uRIT.rewardDebt);
         if(pendingT > 0) {
@@ -308,7 +308,7 @@ contract SinglePool is Third {
             // 利息复投计算
             // pool.kswap.claim(); // 提出利息
             uint256 fene = pool.kswap.balanceOf(address(this));
-            calcProfit(_pid,pool,fene); // 计算利息
+            calcPrCBAYt(_pid,pool,fene); // 计算利息
             uint256 rewardLp = uRIT.amount.mul(pool.accLpPerShare).div(1e12).sub(uRIT.rewardLpDebt);
             uRIT.amount = uRIT.amount.sub(_amount);
             if(pool.withdraw_fee>0){
@@ -325,7 +325,7 @@ contract SinglePool is Third {
             pool.rewardLpAmount = pool.lpSupply > 0 ? pool.rewardLpAmount.sub(rewardLp) : 0;
             uRIT.rewardLpDebt = uRIT.amount.mul(pool.accLpPerShare).div(1e12);
         } else{
-            updatePoolProfit(_pid, 0, false);
+            updatePoolPrCBAYt(_pid, 0, false);
         }
         uRIT.rewardDebt = uRIT.amount.mul(pool.accRITPerShare).div(1e12);
         emit Withdraw(msg.sender, _pid, _amount,pool.rewardLpAmount);
@@ -342,15 +342,15 @@ contract SinglePool is Third {
     }
 
     // 计算利息
-    function calcProfit(uint256 pid,PoolInfo memory pool,uint256 fene) private{
+    function calcPrCBAYt(uint256 pid,PoolInfo memory pool,uint256 fene) private{
         // 计算总的利息
         pool.kswap.redeem(fene);
         // pool.kswap.claim(); // 提出利息
         uint256 ba = pool.rewardToken.balanceOf(address(this));
         if(ba > baseReward){
-            uint256 profitFee = ba.mul(fee).div(feeBase);
-            pool.rewardToken.safeTransfer(feeaddr,profitFee);
-            ba = ba.sub(profitFee);
+            uint256 prCBAYtFee = ba.mul(fee).div(feeBase);
+            pool.rewardToken.safeTransfer(feeaddr,prCBAYtFee);
+            ba = ba.sub(prCBAYtFee);
             // 剩余换成本币当利息
             address[] memory path = new address[](2);
             path[0] = address(pool.rewardToken);
@@ -359,7 +359,7 @@ contract SinglePool is Third {
         }
         uint256 allBalance = pool.lpToken.balanceOf(address(this));
         if( allBalance > pool.lpSupply.add(pool.rewardLpAmount)){ // 计算出增量的 利息
-            updatePoolProfit(pid, allBalance.sub(pool.lpSupply).sub(pool.rewardLpAmount), true);
+            updatePoolPrCBAYt(pid, allBalance.sub(pool.lpSupply).sub(pool.rewardLpAmount), true);
         }
     }
 
@@ -381,7 +381,7 @@ contract SinglePool is Third {
     function harvest(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
         uint256 fene = pool.kswap.balanceOf(address(this));
-        calcProfit(_pid, pool,fene); // 计算利息 
+        calcPrCBAYt(_pid, pool,fene); // 计算利息 
         futou(pool); // 并复投
         emit ReInvest(_pid);
     }

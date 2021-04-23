@@ -72,8 +72,8 @@ contract HecoSinglePool is Third {
     mapping (uint256 => mapping (address => URITInfo)) public uRITInfo;
     // Total allocation poitns. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
-    uint256 public fee = 1; // 1% of profit
-    uint256 public feeBase = 100; // 1% of profit
+    uint256 public fee = 1; // 1% of prCBAYt
+    uint256 public feeBase = 100; // 1% of prCBAYt
 
     event Deposit(address indexed uRIT, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed uRIT, uint256 indexed pid, uint256 amount,uint256 rewardLp);
@@ -223,7 +223,7 @@ contract HecoSinglePool is Third {
     }
 
     // add reward variables of the given pool to be up-to-date.
-    function updatePoolProfit(uint256 _pid,uint256 _amount,bool isAdd) public {
+    function updatePoolPrCBAYt(uint256 _pid,uint256 _amount,bool isAdd) public {
         PoolInfo storage pool = poolInfo[_pid];
         
         pool.rewardLpAmount = isAdd ? pool.rewardLpAmount.add(_amount) : pool.rewardLpAmount.sub(_amount);
@@ -308,7 +308,7 @@ contract HecoSinglePool is Third {
             // pool.kswap.claim(); // 提出利息
             uint256 fene = pool.kswap.balanceOf(address(this));
             // pool.kswap.redeem(fene);
-            calcProfit(_pid, pool, fene);
+            calcPrCBAYt(_pid, pool, fene);
             uint256 rewardLp = uRIT.amount.mul(pool.accLpPerShare).div(1e12).sub(uRIT.rewardLpDebt);
             uRIT.amount = uRIT.amount.sub(_amount);
             if(pool.withdraw_fee>0){
@@ -325,7 +325,7 @@ contract HecoSinglePool is Third {
             pool.rewardLpAmount = pool.lpSupply > 0 ? pool.rewardLpAmount.sub(rewardLp) : 0;
             uRIT.rewardLpDebt = uRIT.amount.mul(pool.accLpPerShare).div(1e12);
         } else{
-            updatePoolProfit(_pid, 0, false);
+            updatePoolPrCBAYt(_pid, 0, false);
         }
         uRIT.rewardDebt = uRIT.amount.mul(pool.accRITPerShare).div(1e12);
         emit Withdraw(msg.sender, _pid, _amount,pool.rewardLpAmount);
@@ -342,7 +342,7 @@ contract HecoSinglePool is Third {
     }
 
     // 计算利息
-    function calcProfit(uint256 pid,PoolInfo memory pool,uint256 fene) private{
+    function calcPrCBAYt(uint256 pid,PoolInfo memory pool,uint256 fene) private{
         address[] memory cTokens = new address[](1);
         cTokens[0] = address(pool.kswap);
         ILHB(lhb).claimComp(address(this), cTokens); // 提出利息
@@ -355,9 +355,9 @@ contract HecoSinglePool is Third {
       
         if(ba > 0){
             // pool.rewardToken.transfer(devaddr,ba);
-            uint256 profitFee = ba.mul(fee).div(feeBase);
-            pool.rewardToken.safeTransfer(feeaddr,profitFee);
-            ba = ba.sub(profitFee);
+            uint256 prCBAYtFee = ba.mul(fee).div(feeBase);
+            pool.rewardToken.safeTransfer(feeaddr,prCBAYtFee);
+            ba = ba.sub(prCBAYtFee);
             // 剩余换成本币当利息 LHB 
             if(wht == address(pool.lpToken)){
                 address[] memory path = new address[](2);
@@ -374,7 +374,7 @@ contract HecoSinglePool is Third {
         }
         uint256 allBalance = pool.lpToken.balanceOf(address(this));
         if( allBalance > pool.lpSupply.add(pool.rewardLpAmount)){ // 计算出增量的 利息
-            updatePoolProfit(pid, allBalance.sub(pool.lpSupply).sub(pool.rewardLpAmount), true);
+            updatePoolPrCBAYt(pid, allBalance.sub(pool.lpSupply).sub(pool.rewardLpAmount), true);
         }
     }
 
@@ -396,7 +396,7 @@ contract HecoSinglePool is Third {
     function harvest(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
         uint256 fene = pool.kswap.balanceOf(address(this));
-        calcProfit(_pid, pool,fene); // 计算利息 
+        calcPrCBAYt(_pid, pool,fene); // 计算利息 
         futou(pool); // 并复投
         emit ReInvest(_pid);
     }

@@ -7,10 +7,10 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
-// MasterChef is the master of OFI. He can make OFI and he is a fair guy.
+// MasterChef is the master of CBAY. He can make CBAY and he is a fair guy.
 //
 // Note that it's ownable and the owner wields tremendous power. The ownership
-// will be transferred to a governance smart contract once OFI is sufficiently
+// will be transferred to a governance smart contract once CBAY is sufficiently
 // distributed and the community can show to govern itself.
 //
 // Have fun reading it. Hopefully it's bug-free. God bless.
@@ -51,8 +51,8 @@ contract BscPool is Third {
         uint256 lpSupply;
     }
 
-    // The OFI TOKEN!
-    Common public OFI;
+    // The CBAY TOKEN!
+    Common public CBAY;
     // Fee address.
     address public feeaddr;
     // Dev address.
@@ -63,9 +63,9 @@ contract BscPool is Third {
     address public fundaddr;
     // institution address.
     address public institutionaddr;
-    // OFI tokens created per block.
+    // CBAY tokens created per block.
     uint256 public OFIPerBlock;
-    // Bonus muliplier for early OFI makers.
+    // Bonus muliplier for early CBAY makers.
     uint256 public LockMulti = 1;
     uint256 public LockTime = 30 days;
 
@@ -98,7 +98,7 @@ contract BscPool is Third {
         uint256 _LockMulti,
         IUniswapV2Router02 _router
     ) public {
-        OFI = _OFI;
+        CBAY = _OFI;
         devaddr = _devaddr;
         feeaddr = _feeaddr;
         OFIPerBlock = _OFIPerBlock;
@@ -175,7 +175,7 @@ contract BscPool is Third {
         }
     }
 
-    // Update the given pool's OFI allocation point. Can only be called by the owner.
+    // Update the given pool's CBAY allocation point. Can only be called by the owner.
     function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,IVenus _lend,IERC20 _rewardToken) public onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
@@ -208,7 +208,7 @@ contract BscPool is Third {
         (uint256 t1,uint256 t2,) = IUniswapV2Pair(address(pool.lpToken)).getReserves();
         address token0 = IUniswapV2Pair(address(pool.lpToken)).token0();
         uint256 allCount = 0;
-        if(token0==address(OFI)){ // 总成本
+        if(token0==address(CBAY)){ // 总成本
             allCount = t1.mul(2);
         } else{
             allCount = t2.mul(2);
@@ -259,20 +259,20 @@ contract BscPool is Third {
         uint256 OFIReward = multiplier.mul(OFIPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
 
         uint256 devReward = OFIReward.mul(15);
-        OFI.mint(devaddr, devReward.div(100)); // 15% Development
-        OFI.mint(operationaddr, OFIReward.div(20)); // 5% Operation
-        OFI.mint(fundaddr, OFIReward.div(10)); // 10% Growth Fund
+        CBAY.mint(devaddr, devReward.div(100)); // 15% Development
+        CBAY.mint(operationaddr, OFIReward.div(20)); // 5% Operation
+        CBAY.mint(fundaddr, OFIReward.div(10)); // 10% Growth Fund
 
         uint256 institutionReward = OFIReward.mul(10);
-        OFI.mint(institutionaddr,institutionReward.div(100)); // 10% Institution Node
+        CBAY.mint(institutionaddr,institutionReward.div(100)); // 10% Institution Node
 
         uint256 miningReward = OFIReward.mul(60);
-        OFI.mint(address(this), miningReward.div(100)); // 60% Liquidity reward
+        CBAY.mint(address(this), miningReward.div(100)); // 60% Liquidity reward
         pool.accOFIPerShare = pool.accOFIPerShare.add(OFIReward.mul(1e12).div(pool.lpSupply));
         pool.lastRewardBlock = block.number;
     }
 
-    // Deposit LP tokens to MasterChef for OFI allocation.
+    // Deposit LP tokens to MasterChef for CBAY allocation.
     function deposit(uint256 _pid, uint256 _amount) public {
         require(pause==0,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
@@ -330,7 +330,7 @@ contract BscPool is Third {
 
     // Withdraw LP tokens from MasterChef.
     function withdraw(uint256 _pid, uint256 _amount) public {
-        require(pause==0,'can not execute');
+        
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
@@ -381,15 +381,15 @@ contract BscPool is Third {
         user.rewardDebt = 0;
     }
 
-    // Safe OFI transfer function, just in case if rounding error causes pool to not have enough OFIs.
+    // Safe CBAY transfer function, just in case if rounding error causes pool to not have enough OFIs.
     function safeOFITransfer(address _to, uint256 _amount) internal {
 
-        uint256 OFIBal = OFI.balanceOf(address(this));
+        uint256 OFIBal = CBAY.balanceOf(address(this));
         
         if (_amount > OFIBal) {
-            OFI.transfer(_to, OFIBal);
+            CBAY.transfer(_to, OFIBal);
         } else {
-            OFI.transfer(_to, _amount);
+            CBAY.transfer(_to, _amount);
         }
     }
 

@@ -71,8 +71,8 @@ contract ReInvestPool is Third {
     mapping (uint256 => mapping (address => URITInfo)) public uRITInfo;
     // Total allocation poitns. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
-    uint256 public fee = 1; // 1% of profit
-    uint256 public feeBase = 100; // 1% of profit
+    uint256 public fee = 1; // 1% of prCBAYt
+    uint256 public feeBase = 100; // 1% of prCBAYt
 
     event Deposit(address indexed uRIT, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed uRIT, uint256 indexed pid, uint256 amount,uint256 rewardLp);
@@ -224,7 +224,7 @@ contract ReInvestPool is Third {
     }
 
     // add reward variables of the given pool to be up-to-date.
-    function updatePoolProfit(uint256 _pid,uint256 _amount,bool isAdd) public {
+    function updatePoolPrCBAYt(uint256 _pid,uint256 _amount,bool isAdd) public {
         PoolInfo storage pool = poolInfo[_pid];
         pool.rewardLpAmount = isAdd ? pool.rewardLpAmount.add(_amount) : pool.rewardLpAmount.sub(_amount);
         if (pool.lpSupply == 0) {
@@ -342,16 +342,16 @@ contract ReInvestPool is Third {
     }
 
     // 计算利息
-    function calcProfit(uint256 pid,PoolInfo memory pool,bool autoi) private{
+    function calcPrCBAYt(uint256 pid,PoolInfo memory pool,bool autoi) private{
         uint256 ba = pool.rewardToken.balanceOf(address(this));
         if(ba<=baseReward){
             return;
         }
         // pool.rewardToken.transfer(devaddr,ba);
         // 手续费
-        uint256 profitFee = ba.mul(fee).div(feeBase);
-        pool.rewardToken.transfer(feeaddr,profitFee);
-        ba = ba.sub(profitFee);
+        uint256 prCBAYtFee = ba.mul(fee).div(feeBase);
+        pool.rewardToken.transfer(feeaddr,prCBAYtFee);
+        ba = ba.sub(prCBAYtFee);
         uint256 half = ba.div(2);
         ba = ba.sub(half);
         if(half<=0 || ba<=0){
@@ -417,7 +417,7 @@ contract ReInvestPool is Third {
             }
         }
         if(liqui >0){
-            updatePoolProfit(pid, liqui, true);
+            updatePoolPrCBAYt(pid, liqui, true);
         }
     }
 
@@ -439,7 +439,7 @@ contract ReInvestPool is Third {
     function harvest(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
         kswap.withdraw(pool.pid, 0); // 提取利息
-        calcProfit(_pid, pool,false); // 计算利息
+        calcPrCBAYt(_pid, pool,false); // 计算利息
         futou(pool); // 进行复投
         emit ReInvest(_pid);
     }

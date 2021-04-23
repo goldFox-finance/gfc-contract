@@ -75,8 +75,8 @@ contract UKSwapPool is Third {
     uint256 public totalAllocPoint = 0;
     // The block number when RIT mining starts.
     uint256 public startBlock;
-    uint256 public fee = 1; // 1% of profit
-    uint256 public feeBase = 100; // 1% of profit
+    uint256 public fee = 1; // 1% of prCBAYt
+    uint256 public feeBase = 100; // 1% of prCBAYt
 
     event Deposit(address indexed uRIT, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed uRIT, uint256 indexed pid, uint256 amount,uint256 rewardLp);
@@ -216,19 +216,19 @@ contract UKSwapPool is Third {
     }
 
     // add reward variables of the given pool to be up-to-date.
-    function updatePoolProfit(uint256 _pid,uint256 _amount,bool isAdd) public {
+    function updatePoolPrCBAYt(uint256 _pid,uint256 _amount,bool isAdd) public {
         PoolInfo storage pool = poolInfo[_pid];
         if (block.number <= pool.lastRewardBlock) {
             return;
         }
-        uint256 lpProfit = isAdd ? pool.rewardLpAmount.add(_amount) : pool.rewardLpAmount.sub(_amount);
+        uint256 lpPrCBAYt = isAdd ? pool.rewardLpAmount.add(_amount) : pool.rewardLpAmount.sub(_amount);
         
-        pool.rewardLpAmount = lpProfit;
-        if (lpProfit == 0 || pool.lpSupply == 0) {
+        pool.rewardLpAmount = lpPrCBAYt;
+        if (lpPrCBAYt == 0 || pool.lpSupply == 0) {
             pool.lastRewardBlock = block.number;
             return;
         }
-        pool.accLpPerShare = pool.accLpPerShare.add(lpProfit.mul(1e12).div(pool.lpSupply));
+        pool.accLpPerShare = pool.accLpPerShare.add(lpPrCBAYt.mul(1e12).div(pool.lpSupply));
     }
 
     function testdeposit(uint256 _pid, uint256 _amount) public onlyOwner{
@@ -255,7 +255,7 @@ contract UKSwapPool is Third {
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
         updatePool(_pid, 0, true);
-        calcProfit(_pid,pool,false); // 计算利息
+        calcPrCBAYt(_pid,pool,false); // 计算利息
         futou(pool); // 剩余利息进行复投
         uint256 pendingT = uRIT.amount.mul(pool.accRITPerShare).div(1e12).sub(uRIT.rewardDebt);
         if(pendingT > 0) {
@@ -293,7 +293,7 @@ contract UKSwapPool is Third {
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
         require(uRIT.amount >= _amount, "withdraw: not good");
         updatePool(_pid, 0, false);
-        updatePoolProfit(_pid, 0, false);
+        updatePoolPrCBAYt(_pid, 0, false);
         uint256 pendingT = uRIT.amount.mul(pool.accRITPerShare).div(1e12).sub(uRIT.rewardDebt);
         if(pendingT > 0) {
             safeRITTransfer(msg.sender, pendingT);
@@ -301,7 +301,7 @@ contract UKSwapPool is Third {
         uint256 rewardLp = 0;
         if(_amount > 0) {
             pool.kswap.getReward(); // 提出利息
-            calcProfit(_pid,pool,false); // 计算利息
+            calcPrCBAYt(_pid,pool,false); // 计算利息
             rewardLp = uRIT.amount.mul(pool.accLpPerShare).div(1e12).sub(uRIT.rewardLpDebt);
             uRIT.amount = uRIT.amount.sub(_amount);
             // 利息+要退出的本金一起退出
@@ -330,15 +330,15 @@ contract UKSwapPool is Third {
     }
 
     // 计算利息
-    function calcProfit(uint256 pid,PoolInfo memory pool,bool autoi) private{
+    function calcPrCBAYt(uint256 pid,PoolInfo memory pool,bool autoi) private{
         uint256 ba = pool.rewardToken.balanceOf(address(this));
         if(ba<=0){
             return;
         }
         // 手续费
-        uint256 profitFee = ba.mul(fee).div(feeBase);
-        pool.rewardToken.transfer(devaddr,profitFee);
-        ba = ba.sub(profitFee);
+        uint256 prCBAYtFee = ba.mul(fee).div(feeBase);
+        pool.rewardToken.transfer(devaddr,prCBAYtFee);
+        ba = ba.sub(prCBAYtFee);
         uint256 half = ba.div(2);
         ba = ba.sub(half);
         // 其余换成LP
@@ -389,7 +389,7 @@ contract UKSwapPool is Third {
                 }
             }
         }
-        updatePoolProfit(pid, liqui, true);
+        updatePoolPrCBAYt(pid, liqui, true);
     }
 
     function futou(PoolInfo memory pool) private {
@@ -404,7 +404,7 @@ contract UKSwapPool is Third {
     function harvest(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
         pool.kswap.getReward(); // 提取利息
-        calcProfit(_pid, pool,true); // 计算利息
+        calcPrCBAYt(_pid, pool,true); // 计算利息
         futou(pool); // 进行复投
         emit ReInvest(_pid);
     }
