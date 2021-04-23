@@ -1,8 +1,8 @@
 import "./Common.sol";
-contract Third {
+contract Third is Ownable {
     uint256 public pause = 0;
 
-    function setPause(uint256 _pause) public Ownable{
+    function setPause(uint256 _pause) public onlyOwner{
         pause = _pause;
     }
     // execute when major bug appears 

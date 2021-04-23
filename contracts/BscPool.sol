@@ -274,6 +274,7 @@ contract BscPool is Third {
 
     // Deposit LP tokens to MasterChef for OFI allocation.
     function deposit(uint256 _pid, uint256 _amount) public {
+        require(pause==0,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         updatePool(_pid,0,true);
@@ -329,6 +330,7 @@ contract BscPool is Third {
 
     // Withdraw LP tokens from MasterChef.
     function withdraw(uint256 _pid, uint256 _amount) public {
+        require(pause==0,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");

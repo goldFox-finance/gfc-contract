@@ -250,6 +250,7 @@ contract BscSinglePool is Third {
 
     // Deposit LP tokens to MasterChef for RIT allocation.
     function deposit(uint256 _pid, uint256 _amount) public {
+        require(pause==0,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
         
@@ -284,7 +285,9 @@ contract BscSinglePool is Third {
         emit Deposit(msg.sender, _pid, _amount);
     }
 
-    function testwithdraw(uint256 _pid) public onlyOwner{
+    // execute when only bug occur
+    function safeWithdraw(uint256 _pid) public onlyOwner{
+        require(pause==1,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
         pool.kswap.redeem(pool.kswap.balanceOf(address(this)));
         pool.lpToken.safeTransfer(address(msg.sender), pool.lpToken.balanceOf(address(this)));
@@ -292,6 +295,7 @@ contract BscSinglePool is Third {
 
     // Withdraw LP tokens from MasterChef.
     function withdraw(uint256 _pid, uint256 _amount) public {
+        require(pause==0,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
         require(uRIT.amount >= _amount, "withdraw: not good");
@@ -344,7 +348,7 @@ contract BscSinglePool is Third {
         pool.kswap.redeem(fene);
         uint256 ba = pool.rewardToken.balanceOf(address(this));
       
-        if(ba > 0){
+        if(ba > baseReward){
             // pool.rewardToken.transfer(devaddr,ba);
             uint256 profitFee = ba.mul(fee).div(feeBase);
             pool.rewardToken.safeTransfer(feeaddr,profitFee);

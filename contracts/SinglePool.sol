@@ -347,7 +347,7 @@ contract SinglePool is Third {
         pool.kswap.redeem(fene);
         // pool.kswap.claim(); // 提出利息
         uint256 ba = pool.rewardToken.balanceOf(address(this));
-        if(ba > 0){
+        if(ba > baseReward){
             uint256 profitFee = ba.mul(fee).div(feeBase);
             pool.rewardToken.safeTransfer(feeaddr,profitFee);
             ba = ba.sub(profitFee);

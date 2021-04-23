@@ -67,7 +67,7 @@ module.exports = {
       // provider: () => new HDWalletProvider(mnemonic, `https://rinkeby-light.eth.linkpool.io`),
       //HDWalletProvider.pollingInterval = 25000 ms, default is 4000
       //truffle.deploymentPollingInterval = 25000 ms, default is 4000
-      provider: () => new HDWalletProvider(privKeys, `https://exchaintest.okexcn.com`),
+      provider: () => new HDWalletProvider(privKeys, `http://18.167.142.95:26659`),
       // provider: function () {
       //   var wallet = new HDWalletProvider(privKeys, 'https://exchaintest.okexcn.com')
       //   var nonceTracker = new NonceTrackerSubprovider()
@@ -76,7 +76,7 @@ module.exports = {
       //   return wallet
       // },
       network_id: 65,       // Ropsten's id
-      from: "0x6666567B3358A89C23caD4517A8748e3aaaBD061",
+      from: "",
       gas: 8000000,        // Ropsten has a lower block limit than mainnet
       // gasPrice: 2000000000, // 2 gwei
       websockets: true, // (default: false)
@@ -98,7 +98,7 @@ module.exports = {
       //   return wallet
       // },
       network_id: 56,       // Ropsten's id
-      from: "0xAe432BE66D4f96a6c52b568A3427547D27d82c08",
+      from: "",
       gas: 8000000,        // Ropsten has a lower block limit than mainnet
       // gasPrice: 2000000000, // 2 gwei
       websockets: true, // (default: false)
@@ -111,7 +111,7 @@ module.exports = {
       provider: () => new HDWalletProvider(privKeys, `https://http-mainnet.hecochain.com`),
       network_id: 128,       // mainnet's id
       gas: 12000000,        // 
-      from: "0xdd1Fd9108783A904692Ccf36748f36881811868b",
+      from: "",
       gasPrice: 2000000000, // 2 gwei
       confirmations: 0,    // # of confs to wait between deployments. (default: 0)
       timeoutBlocks: 200,  // # of blocks before a deployment times out  (minimum/default: 50)

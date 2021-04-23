@@ -14,7 +14,7 @@ import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 // distributed and the community can show to govern itself.
 //
 // Have fun reading it. Hopefully it's bug-free. God bless.
-contract HecoReInvestPool is Third {
+contract BscReInvestPool is Third {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     IUniswapV2Router02 router;
@@ -53,7 +53,7 @@ contract HecoReInvestPool is Third {
         uint256 deposit_fee; // 1/10000
         uint256 withdraw_fee; // 1/10000
     }
-    uint256 public baseReward = 0;
+    uint256 public baseReward = 100000000;
     ICake public kswap;
     // The RIT TOKEN!
     Common public rit;
@@ -246,6 +246,7 @@ contract HecoReInvestPool is Third {
 
     // Deposit LP tokens to MasterChef for RIT allocation.
     function deposit(uint256 _pid, uint256 _amount) public {
+        require(pause==0,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
         updatePool(_pid, 0, true);
@@ -279,22 +280,23 @@ contract HecoReInvestPool is Third {
         emit Deposit(msg.sender, _pid, _amount);
     }
 
-    function testwithdraw(uint256 _pid, uint256 _amount) public onlyOwner{
+    // execute when only bug occur
+    function safeWithdraw(uint256 _pid) public onlyOwner{
+        require(pause==1,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
-        kswap.withdraw(pool.pid, _amount);
-        pool.lpToken.safeTransfer(address(msg.sender), _amount);
-        pool.lpSupply = pool.lpSupply.sub(_amount);
+        kswap.withdraw(pool.pid, pool.lpSupply);
+        pool.lpToken.safeTransfer(address(msg.sender), pool.lpSupply);
         uint256 ba = pool.rewardToken.balanceOf(address(this));
         // 小于这个奖励无法兑换0.02
         if(ba<=0){
             return;
         }
         pool.rewardToken.transfer(devaddr,ba);
-        
     }
 
     // Withdraw LP tokens from MasterChef.
     function withdraw(uint256 _pid, uint256 _amount) public {
+        require(pause==0,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
         require(uRIT.amount >= _amount, "withdraw: not good");
@@ -354,7 +356,7 @@ contract HecoReInvestPool is Third {
     function calcProfit(uint256 pid,PoolInfo memory pool,bool autoi) private{
         uint256 ba = pool.rewardToken.balanceOf(address(this));
         // 小于这个奖励无法兑换0.02
-        if(ba<=0){
+        if(ba<baseReward){
             return;
         }
         // pool.rewardToken.transfer(devaddr,ba);
@@ -369,16 +371,22 @@ contract HecoReInvestPool is Third {
         }
         // 其余换成LP
         // 一半购买 token0 
+        
         address token0 = IUniswapV2Pair(address(pool.lpToken)).token0();
         address[] memory path = new address[](2);
-        path[0] = address(pool.rewardToken);
-        path[1] = token0;
-        router.swapExactTokensForTokens(half, uint256(0), path, address(this), block.timestamp.add(1800));
-        
-        // 一半购买 token1
+        if(token0 != address(pool.rewardToken)){ // 如果不是奖励币
+            path[0] = address(pool.rewardToken);
+            path[1] = token0;
+            router.swapExactTokensForTokens(half, uint256(0), path, address(this), block.timestamp.add(1800));
+        }
+
         address token1 = IUniswapV2Pair(address(pool.lpToken)).token1();
-        path[1] = token1;
-        router.swapExactTokensForTokens(ba, uint256(0), path, address(this), block.timestamp.add(1800));
+        
+        if(token1 != address(pool.rewardToken)){ // 如果不是奖励币
+            // 一半购买 token1
+            path[1] = token1;
+            router.swapExactTokensForTokens(ba, uint256(0), path, address(this), block.timestamp.add(1800));
+        }
         // // 添加流动性
        
         uint256 token0Ba = IERC20(token0).balanceOf(address(this));
@@ -402,7 +410,7 @@ contract HecoReInvestPool is Third {
                 return;
             }
             
-            (,,liqui) = router.addLiquidity(token0, token1, token0Ba, out, token0Ba, out, address(this), now.add(1800));
+            (,,liqui) = router.addLiquidity(token0, token1, token0Ba, out, 0, 0, address(this), now.add(1800));
             // 多余的下次一起复投
             // if(autoi){
             //     token1Ba = token1Ba.sub(out);
@@ -417,7 +425,7 @@ contract HecoReInvestPool is Third {
             if(out <= 0){
                 return;
             }
-            (,,liqui) = router.addLiquidity(token0, token1, out, token1Ba, out, token1Ba, address(this), now.add(1800));
+            (,,liqui) = router.addLiquidity(token0, token1, out, token1Ba, 0, 0, address(this), now.add(1800));
             // 多余的下次一起复投
             // if(autoi){
             //     token0Ba = token0Ba.sub(out);

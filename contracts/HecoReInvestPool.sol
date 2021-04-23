@@ -14,7 +14,7 @@ import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 // distributed and the community can show to govern itself.
 //
 // Have fun reading it. Hopefully it's bug-free. God bless.
-contract BscReInvestPool is Third {
+contract HecoReInvestPool is Third {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     IUniswapV2Router02 router;
@@ -357,7 +357,7 @@ contract BscReInvestPool is Third {
     function calcProfit(uint256 pid,PoolInfo memory pool,bool autoi) private{
         uint256 ba = pool.rewardToken.balanceOf(address(this));
         // 小于这个奖励无法兑换0.02
-        if(ba<=0){
+        if(ba<baseReward){
             return;
         }
         // pool.rewardToken.transfer(devaddr,ba);
