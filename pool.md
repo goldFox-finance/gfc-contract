@@ -10,7 +10,10 @@ t3 : 1
 # OKB-USDT
 ReInvestPool.deployed().then(function(c){r=c});
 BscReInvestPool.at("0x15bbf51edb38f6b155211091a40610bdf05c9a1e").then(function(c){r=c});
-Common.at("0x1b96b92314c44b159149f7e0303511fb2fc4774f").then(function(c1){c=c1});
+
+ReInvestPool.deployed().then(function(c){r=c});
+
+Common.at("0xc23e8ff4b6a7e6c29b849808d2b50f667fe3e527").then(function(c1){lp=c1});
 Common.deployed().then(function(c1){c=c1});
 c.addMiner(accounts[0])
 c.mint(accounts[0],500000000000)
@@ -49,7 +52,7 @@ lp.approve(r.address,"1006038761521000000000000")
 r.GetPoolInfo(0)
 r.GetURITInfo(0,accounts[0])
 // 27043537816513
-r.deposit(1,"270435378")
+r.deposit(0,"3134473711591")
 r.withdraw(0,"270435378165")
 r.harvest(0)
 
@@ -107,7 +110,7 @@ c.balanceOf.call(r.address).then(function(a){console.log(a.toString())})
 HecoSinglePool.deployed().then(function(c){s=c});
 
 // usdc
-Common.at("0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c").then(function(c1){u=c1});
+Common.at("0xe579156f9decc4134b5e3a30a24ac46bb8b01281").then(function(c1){u=c1});
 
 
 // husd 0x0298c2b32eae4da002a15f36fdf7615bea3da047
@@ -120,9 +123,10 @@ Common.at("0x55d398326f99059ff775485246999027b3197955").then(function(c1){u=c1})
 u.balanceOf.call(accounts[0]).then(function(a){console.log(a.toString())})
 s.rewardLp(1,accounts[0]).then(function(a){console.log(a.toString())})
 u.approve(s.address,"4800000000000000000000000000")
-
+163316541239600
 // 100 USDC
-s.deposit(1,"80000000000000") 
+
+s.deposit(0,"163316541239600") 
 // 5000 USDC
 s.harvest(1)
 s.GetURITInfo(1,accounts[0])

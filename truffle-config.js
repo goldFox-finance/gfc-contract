@@ -67,7 +67,7 @@ module.exports = {
       // provider: () => new HDWalletProvider(mnemonic, `https://rinkeby-light.eth.linkpool.io`),
       //HDWalletProvider.pollingInterval = 25000 ms, default is 4000
       //truffle.deploymentPollingInterval = 25000 ms, default is 4000
-      provider: () => new HDWalletProvider(privKeys, `http://18.167.142.95:26659`),
+      provider: () => new HDWalletProvider(privKeys, `https://exchaintestrpc.okex.org`),
       // provider: function () {
       //   var wallet = new HDWalletProvider(privKeys, 'https://exchaintest.okexcn.com')
       //   var nonceTracker = new NonceTrackerSubprovider()
