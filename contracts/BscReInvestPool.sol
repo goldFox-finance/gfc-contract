@@ -190,6 +190,9 @@ contract BscReInvestPool is Third {
     function rewardLp(uint256 _pid, address _user) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][_user];
+        if(thirdPool.userInfo(pool.pid, address(this)).amount <= 0){
+            return 0;
+        }
         uint256 ba = getWithdrawBalance(_pid, userShares[_pid][_user], thirdPool.userInfo(pool.pid, address(this)).amount);
         if(ba > uRIT.amount){
             return ba.sub(uRIT.amount);
@@ -309,7 +312,7 @@ contract BscReInvestPool is Third {
                 pool.lpToken.safeTransfer(devaddr, needFee);
             }
             // 
-            safeLpTransfer(pool,address(msg.sender),_amount);
+            safeLpTransfer(_pid,address(msg.sender),_amount);
             _burn(_pid, _shares, msg.sender);
         }
         harvest(_pid);
@@ -319,7 +322,8 @@ contract BscReInvestPool is Third {
     }
 
         // Safe RIT transfer function, just in case if rounding error causes pool to not have enough RITs.
-    function safeLpTransfer(PoolInfo memory pool,address _to, uint256 _amount) internal {
+    function safeLpTransfer(uint256 _pid,address _to, uint256 _amount) internal {
+        PoolInfo storage pool = poolInfo[_pid];
         uint256 RITBal = pool.lpToken.balanceOf(address(this));
         require(RITBal>=_amount,"wait other platform!!!");
         if(RITBal>_amount){
@@ -340,6 +344,7 @@ contract BscReInvestPool is Third {
     // 
     function calcProfit(uint256 _pid) private{
         PoolInfo storage pool = poolInfo[_pid];
+        thirdPool.deposit(pool.pid, 0); // 
         uint256 ba = pool.rewardToken.balanceOf(address(this));
         if(ba<baseReward){
             return;
@@ -419,6 +424,7 @@ contract BscReInvestPool is Third {
             // pool.lpToken.transfer(devaddr,liqui);
             // return;
         }
+        futou(pool); // 
     }
 
     function futou(PoolInfo memory pool) private {
@@ -437,10 +443,7 @@ contract BscReInvestPool is Third {
 
     // auto reinvest
     function harvest(uint256 _pid) public {
-        PoolInfo storage pool = poolInfo[_pid];
-        thirdPool.deposit(pool.pid, 0); // 
         calcProfit(_pid); // 
-        futou(pool); // 
         emit ReInvest(_pid);
     }
 

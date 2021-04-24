@@ -189,6 +189,9 @@ contract BscSinglePool is Third {
     function rewardLp(uint256 _pid, address _user) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][_user];
+        if(pool.thirdAllBalance <= 0){
+            return 0;
+        }
         uint256 ba = getWithdrawBalance(_pid, userShares[_pid][_user], pool.thirdAllBalance);
         if(ba > uRIT.amount){
             return ba.sub(uRIT.amount);
@@ -307,7 +310,7 @@ contract BscSinglePool is Third {
                 _amount = _amount.sub(needFee);
                 pool.lpToken.safeTransfer(devaddr, needFee);
             }
-            safeLpTransfer(pool,address(msg.sender),_amount);
+            safeLpTransfer(_pid,address(msg.sender),_amount);
             _burn(_pid, _shares, msg.sender);
         }
         harvest(_pid);
@@ -315,7 +318,8 @@ contract BscSinglePool is Third {
         emit Withdraw(msg.sender, _pid, _amount);
     }
 
-    function safeLpTransfer(PoolInfo memory pool,address _to, uint256 _min) internal {
+    function safeLpTransfer(uint256 _pid,address _to, uint256 _min) internal {
+        PoolInfo storage pool = poolInfo[_pid];
         uint256 RITBal = pool.lpToken.balanceOf(address(this));
         require(RITBal>=_min,"wait other platform!!!");
         if(RITBal>_min){
@@ -325,8 +329,9 @@ contract BscSinglePool is Third {
     }
 
     // 
-    function calcProfit(uint256 _pid,uint256 fene) private{
+    function calcProfit(uint256 _pid) private{
         PoolInfo storage pool = poolInfo[_pid];
+        uint256 fene = pool.thirdPool.balanceOf(address(this));
         // 
         pool.thirdPool.redeem(fene);
         uint256 ba = pool.rewardToken.balanceOf(address(this));
@@ -342,6 +347,7 @@ contract BscSinglePool is Third {
             router.swapExactTokensForTokens(ba, uint256(0), path, address(this), block.timestamp.add(1800));
         }
         pool.thirdAllBalance = pool.lpToken.balanceOf(address(this));
+        futou(pool);
     }
 
     function futou(PoolInfo memory pool) private {
@@ -358,10 +364,7 @@ contract BscSinglePool is Third {
 
     // auto reinvest
     function harvest(uint256 _pid) public {
-        PoolInfo storage pool = poolInfo[_pid];
-        uint256 fene = pool.thirdPool.balanceOf(address(this));
-        calcProfit(_pid,fene); 
-        futou(pool); 
+        calcProfit(_pid); 
         emit ReInvest(_pid);
     }
 
