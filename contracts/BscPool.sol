@@ -24,13 +24,13 @@ contract BscPool is Third {
         uint256 rewardDebt; // Reward debt. See explanation below.
         uint256 lockTime;
         //
-        // We do some fancy math here. Basically, any point in time, the amount of OFIs
+        // We do some fancy math here. Basically, any point in time, the amount of CBAYs
         // entitled to a user but is pending to be distributed is:
         //
-        //   pending reward = (user.amount * pool.accOFIPerShare) - user.rewardDebt
+        //   pending reward = (user.amount * pool.accCBAYPerShare) - user.rewardDebt
         //
         // Whenever a user deposits or withdraws LP tokens to a pool. Here's what happens:
-        //   1. The pool's `accOFIPerShare` (and `lastRewardBlock`) gets updated.
+        //   1. The pool's `accCBAYPerShare` (and `lastRewardBlock`) gets updated.
         //   2. User receives the pending reward sent to his/her address.
         //   3. User's `amount` gets updated.
         //   4. User's `rewardDebt` gets updated.
@@ -39,9 +39,9 @@ contract BscPool is Third {
     // Info of each pool.
     struct PoolInfo {
         IERC20 lpToken;           // Address of LP token contract.
-        uint256 allocPoint;       // How many allocation points assigned to this pool. OFIs to distribute per block.
-        uint256 lastRewardBlock;  // Last block number that OFIs distribution occurs.
-        uint256 accOFIPerShare; // Accumulated OFIs per share, times 1e12. See below.
+        uint256 allocPoint;       // How many allocation points assigned to this pool. CBAYs to distribute per block.
+        uint256 lastRewardBlock;  // Last block number that CBAYs distribution occurs.
+        uint256 accCBAYPerShare; // Accumulated CBAYs per share, times 1e12. See below.
         uint256 minAMount;
         uint256 maxAMount;
         uint256 deposit_fee; // 1/10000
@@ -61,10 +61,8 @@ contract BscPool is Third {
     address public operationaddr;
     // Fund address.
     address public fundaddr;
-    // institution address.
-    address public institutionaddr;
     // CBAY tokens created per block.
-    uint256 public OFIPerBlock;
+    uint256 public CBAYPerBlock;
     // Bonus muliplier for early CBAY makers.
     uint256 public LockMulti = 1;
     uint256 public LockTime = 30 days;
@@ -80,7 +78,7 @@ contract BscPool is Third {
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event SetDev(address indexed devAddress);
-    event SetOFIPerBlock(uint256 _OFIPerBlock);
+    event SetCBAYPerBlock(uint256 _CBAYPerBlock);
     event SetMigrator(address _migrator);
     event SetOperation(address _operation);
     event SetFund(address _fund);
@@ -88,23 +86,22 @@ contract BscPool is Third {
     event SetFee(address _feeaddr);
     event SetPool(uint256 pid ,address lpaddr,uint256 point,uint256 min,uint256 max);
     constructor(
-        Common _OFI,
+        Common _CBAY,
         address _feeaddr,
         address _devaddr,
         address _operationaddr,
         address _fundaddr,
         address _institutionaddr,
-        uint256 _OFIPerBlock,
+        uint256 _CBAYPerBlock,
         uint256 _LockMulti,
         IUniswapV2Router02 _router
     ) public {
-        CBAY = _OFI;
+        CBAY = _CBAY;
         devaddr = _devaddr;
         feeaddr = _feeaddr;
-        OFIPerBlock = _OFIPerBlock;
+        CBAYPerBlock = _CBAYPerBlock;
         operationaddr = _operationaddr;
         fundaddr = _fundaddr;
-        institutionaddr = _institutionaddr;
         router = _router;
         LockMulti = _LockMulti;
     }
@@ -113,9 +110,9 @@ contract BscPool is Third {
         return poolInfo.length;
     }
 
-    function setOFIPerBlock(uint256 _OFIPerBlock) public onlyOwner {
-        OFIPerBlock = _OFIPerBlock;
-        emit SetOFIPerBlock(_OFIPerBlock);
+    function setCBAYPerBlock(uint256 _CBAYPerBlock) public onlyOwner {
+        CBAYPerBlock = _CBAYPerBlock;
+        emit SetCBAYPerBlock(_CBAYPerBlock);
     }
 
     function setLockTime(uint256 _lockTime) public onlyOwner {
@@ -154,7 +151,7 @@ contract BscPool is Third {
             lpToken: _lpToken,
             allocPoint: _allocPoint,
             lastRewardBlock: lastRewardBlock,
-            accOFIPerShare: 0,
+            accCBAYPerShare: 0,
             minAMount:_min,
             maxAMount:_max,
             deposit_fee : _deposit_fee,
@@ -196,13 +193,13 @@ contract BscPool is Third {
         return _to.sub(_from);
     }
 
-    // 获取年化率 以OFI为单位的币本位计算
+   
     function getApy(uint256 _pid) public view returns (uint256) {
-        uint256 yearCount = OFIPerBlock.mul(86400).div(3).mul(365);
+        uint256 yearCount = CBAYPerBlock.mul(86400).div(3).mul(365);
         return yearCount.div(getTvl(_pid));
     }
 
-    // 获取总量 以OFI为单位的币本位
+
     function getTvl(uint256 _pid) public view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         (uint256 t1,uint256 t2,) = IUniswapV2Pair(address(pool.lpToken)).getReserves();
@@ -218,18 +215,18 @@ contract BscPool is Third {
         return allCount.mul(lpSupply).div(totalSupply);
     }
 
-    // View function to see pending OFIs on frontend.
+    // View function to see pending CBAYs on frontend.
     function pendingReward(uint256 _pid, address _user) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
-        uint256 accOFIPerShare = pool.accOFIPerShare;
+        uint256 accCBAYPerShare = pool.accCBAYPerShare;
         uint256 lpSupply = pool.lpSupply;
         if (block.number > pool.lastRewardBlock && lpSupply != 0) {
             uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
-            uint256 OFIReward = multiplier.mul(OFIPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
-            accOFIPerShare = accOFIPerShare.add(OFIReward.mul(1e12).div(lpSupply));
+            uint256 CBAYReward = multiplier.mul(CBAYPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
+            accCBAYPerShare = accCBAYPerShare.add(CBAYReward.mul(1e12).div(lpSupply));
         }
-        uint256 pending = user.amount.mul(accOFIPerShare).div(1e12).sub(user.rewardDebt);
+        uint256 pending = user.amount.mul(accCBAYPerShare).div(1e12).sub(user.rewardDebt);
         if(user.lockTime > now){
             return pending;
         }
@@ -256,19 +253,16 @@ contract BscPool is Third {
             return;
         }
         uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
-        uint256 OFIReward = multiplier.mul(OFIPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
+        uint256 CBAYReward = multiplier.mul(CBAYPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
 
-        uint256 devReward = OFIReward.mul(15);
+        uint256 devReward = CBAYReward.mul(15);
         CBAY.mint(devaddr, devReward.div(100)); // 15% Development
-        CBAY.mint(operationaddr, OFIReward.div(20)); // 5% Operation
-        CBAY.mint(fundaddr, OFIReward.div(10)); // 10% Growth Fund
+        CBAY.mint(operationaddr, CBAYReward.div(20)); // 5% Operation
+        CBAY.mint(fundaddr, CBAYReward.div(10)); // 10% Growth Fund
 
-        uint256 institutionReward = OFIReward.mul(10);
-        CBAY.mint(institutionaddr,institutionReward.div(100)); // 10% Institution Node
-
-        uint256 miningReward = OFIReward.mul(60);
-        CBAY.mint(address(this), miningReward.div(100)); // 60% Liquidity reward
-        pool.accOFIPerShare = pool.accOFIPerShare.add(OFIReward.mul(1e12).div(pool.lpSupply));
+        uint256 miningReward = CBAYReward.mul(70);
+        CBAY.mint(address(this), miningReward.div(100)); // 70% Liquidity reward
+        pool.accCBAYPerShare = pool.accCBAYPerShare.add(CBAYReward.mul(1e12).div(pool.lpSupply));
         pool.lastRewardBlock = block.number;
     }
 
@@ -279,12 +273,12 @@ contract BscPool is Third {
         UserInfo storage user = userInfo[_pid][msg.sender];
         updatePool(_pid,0,true);
         if (user.amount > 0) {
-            uint256 pending = user.amount.mul(pool.accOFIPerShare).div(1e12).sub(user.rewardDebt);
+            uint256 pending = user.amount.mul(pool.accCBAYPerShare).div(1e12).sub(user.rewardDebt);
             if(pending > 0) {
-                if(user.lockTime <= 0){ // 没有锁仓 需要减少收益
+                if(user.lockTime <= 0){ 
                     pending = pending.div(LockMulti);
                 }
-                safeOFITransfer(msg.sender, pending);
+                safeCBAYTransfer(msg.sender, pending);
             }
         }
         if(_amount > 0) {
@@ -301,12 +295,12 @@ contract BscPool is Third {
             if (pool.maxAMount > 0 && user.amount > pool.maxAMount){
                 revert("amount is too high");
             }
-            if(address(pool.lend) != address(0)){ // 需要抵押到lend 借贷平台
+            if(address(pool.lend) != address(0)){ 
                 depositLend( pool, _amount);
             }
             pool.lpSupply = pool.lpSupply.add(_amount);
         }
-        user.rewardDebt = user.amount.mul(pool.accOFIPerShare).div(1e12);
+        user.rewardDebt = user.amount.mul(pool.accCBAYPerShare).div(1e12);
         emit Deposit(msg.sender, _pid, _amount);
     }
 
@@ -324,7 +318,7 @@ contract BscPool is Third {
     function withdrawLend(PoolInfo memory pool) private {
         require(pool.lpSupply>0,"none pool.lpSupply");
         uint256 allAmount = pool.lend.balanceOf(address(this));
-        // 提出所有币 包含利息
+        // 
         pool.lend.redeem(allAmount);
     }
 
@@ -335,17 +329,17 @@ contract BscPool is Third {
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
         updatePool(_pid,0,false);
-        uint256 pending = user.amount.mul(pool.accOFIPerShare).div(1e12).sub(user.rewardDebt);
+        uint256 pending = user.amount.mul(pool.accCBAYPerShare).div(1e12).sub(user.rewardDebt);
         if(pending > 0) {
-            if(user.lockTime <= 0){ // 没有锁仓 需要减少收益
+            if(user.lockTime <= 0){ 
                 pending = pending.div(LockMulti);
             }
-            safeOFITransfer(msg.sender, pending);
+            safeCBAYTransfer(msg.sender, pending);
         }
         if(_amount > 0) {
             require(user.lockTime<=now,"mining in lock,can not withdraw");
             if(address(pool.lend) != address(0)){
-                withdrawLend( pool); // 本金全部提出
+                withdrawLend( pool);
             }
             user.amount = user.amount.sub(_amount);
             if(pool.withdraw_fee>0){
@@ -361,13 +355,13 @@ contract BscPool is Third {
                 ba = pool.lpToken.balanceOf(address(this));
                 ba = pool.lpSupply > ba ? ba : pool.lpSupply;
                 depositLend(pool,ba);
-                if(pool.lpSupply < ba){   // 多余的 转给dev
+                if(pool.lpSupply < ba){   
                     ba = ba.sub(pool.lpSupply);
                     pool.lpToken.safeTransfer(devaddr, ba);
                 }
             }
         }
-        user.rewardDebt = user.amount.mul(pool.accOFIPerShare).div(1e12);
+        user.rewardDebt = user.amount.mul(pool.accCBAYPerShare).div(1e12);
         emit Withdraw(msg.sender, _pid, _amount);
     }
 
@@ -381,13 +375,13 @@ contract BscPool is Third {
         user.rewardDebt = 0;
     }
 
-    // Safe CBAY transfer function, just in case if rounding error causes pool to not have enough OFIs.
-    function safeOFITransfer(address _to, uint256 _amount) internal {
+    // Safe CBAY transfer function, just in case if rounding error causes pool to not have enough CBAYs.
+    function safeCBAYTransfer(address _to, uint256 _amount) internal {
 
-        uint256 OFIBal = CBAY.balanceOf(address(this));
+        uint256 ba = CBAY.balanceOf(address(this));
         
-        if (_amount > OFIBal) {
-            CBAY.transfer(_to, OFIBal);
+        if (_amount > ba) {
+            CBAY.transfer(_to, ba);
         } else {
             CBAY.transfer(_to, _amount);
         }
@@ -415,14 +409,6 @@ contract BscPool is Third {
         require(_fundaddr != address(0), "_fundaddr is address(0)");
         fundaddr = _fundaddr;
         emit SetFund(_fundaddr);
-    }
-
-    // Update institution address by the previous institution.
-    function institution(address _institutionaddr) public {
-        require(msg.sender == institutionaddr, "institution: wut?");
-        require(_institutionaddr != address(0), "_institutionaddr is address(0)");
-        institutionaddr = _institutionaddr;
-        emit SetInstitution(_institutionaddr);
     }
 
     // Update fee address by the previous institution.

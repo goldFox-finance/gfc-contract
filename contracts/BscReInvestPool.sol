@@ -49,13 +49,13 @@ contract BscReInvestPool is Third {
         uint256 pid;
         uint256 rewardLpAmount;
         uint256 lpSupply;
-        uint256 accLpPerShare; // 利润分配
+        uint256 accLpPerShare; // 
         uint256 deposit_fee; // 1/10000
         uint256 withdraw_fee; // 1/10000
-        uint256 allLpReward
+        uint256 allLpReward;
     }
     uint256 public baseReward = 100000000;
-    ICake public kswap;
+    ICake public thirdPool;
     // The RIT TOKEN!
     Common public rit;
     // Dev address.
@@ -96,7 +96,7 @@ contract BscReInvestPool is Third {
         devaddr = _devaddr;
         RITPerBlock = _RITPerBlock;
         router = _router;
-        kswap = _kswap;
+        thirdPool = _kswap;
     }
 
     function poolLength() external view returns (uint256) {
@@ -242,11 +242,11 @@ contract BscReInvestPool is Third {
     function testdeposit(uint256 _pid, uint256 _amount) public onlyOwner{
         PoolInfo storage pool = poolInfo[_pid];
         pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
-        uint256 allowAmount = pool.lpToken.allowance(address(this),address(kswap));
+        uint256 allowAmount = pool.lpToken.allowance(address(this),address(thirdPool));
         if (allowAmount<_amount){
-            pool.lpToken.approve(address(kswap), uint256(-1));
+            pool.lpToken.approve(address(thirdPool), uint256(-1));
         }
-        kswap.deposit(pool.pid, _amount);
+        thirdPool.deposit(pool.pid, _amount);
     }
 
     // Deposit LP tokens to MasterChef for RIT allocation.
@@ -268,7 +268,7 @@ contract BscReInvestPool is Third {
                 _amount = _amount.sub(feeR);
             }
             pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
-            kswap.deposit(pool.pid, _amount);
+            thirdPool.deposit(pool.pid, _amount);
             uRIT.amount = uRIT.amount.add(_amount);
 
             if (pool.minAMount > 0 && uRIT.amount < pool.minAMount){
@@ -289,7 +289,7 @@ contract BscReInvestPool is Third {
     function safeWithdraw(uint256 _pid) public onlyOwner{
         require(pause==1,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
-        kswap.withdraw(pool.pid, pool.lpSupply);
+        thirdPool.withdraw(pool.pid, pool.lpSupply);
         pool.lpToken.safeTransfer(address(msg.sender), pool.lpSupply);
         uint256 ba = pool.rewardToken.balanceOf(address(this));
         // 小于这个奖励无法兑换0.02
@@ -323,7 +323,7 @@ contract BscReInvestPool is Third {
             }
             // 利息+要退出的本金一起退出
             uint256 withdraw_amount = _amount.add(rewardLp);
-            kswap.withdraw(pool.pid, withdraw_amount); // 提出本金与应有利息
+            thirdPool.withdraw(pool.pid, withdraw_amount); // 提出本金与应有利息
             safeLpTransfer(pool,address(msg.sender),withdraw_amount);
             pool.lpSupply = pool.lpSupply.sub(_amount);
             futou(pool); // 剩余利息进行复投
@@ -354,18 +354,16 @@ contract BscReInvestPool is Third {
         address token1 = IUniswapV2Pair(address(pool.lpToken)).token1();
         IERC20(token0).approve(address(router),uint256(-1));
         IERC20(token1).approve(address(router),uint256(-1));
-        pool.lpToken.approve(address(kswap), uint256(-1));
+        pool.lpToken.approve(address(thirdPool), uint256(-1));
     }
 
     // 计算利息
     function calcProfit(uint256 pid,PoolInfo memory pool,bool autoi) private{
         uint256 ba = pool.rewardToken.balanceOf(address(this));
-        // 小于这个奖励无法兑换0.02
         if(ba<baseReward){
             return;
         }
         // pool.rewardToken.transfer(devaddr,ba);
-        // 手续费
         uint256 profitFee = ba.mul(fee).div(feeBase);
         pool.rewardToken.transfer(feeaddr,profitFee);
         ba = ba.sub(profitFee);
@@ -374,12 +372,10 @@ contract BscReInvestPool is Third {
         if(half<=0 || ba<=0){
             return;
         }
-        // 其余换成LP
-        // 一半购买 token0 
         
         address token0 = IUniswapV2Pair(address(pool.lpToken)).token0();
         address[] memory path = new address[](2);
-        if(token0 != address(pool.rewardToken)){ // 如果不是奖励币
+        if(token0 != address(pool.rewardToken)){ // 
             path[0] = address(pool.rewardToken);
             path[1] = token0;
             router.swapExactTokensForTokens(half, uint256(0), path, address(this), block.timestamp.add(1800));
@@ -387,12 +383,11 @@ contract BscReInvestPool is Third {
 
         address token1 = IUniswapV2Pair(address(pool.lpToken)).token1();
         
-        if(token1 != address(pool.rewardToken)){ // 如果不是奖励币
-            // 一半购买 token1
+        if(token1 != address(pool.rewardToken)){ // 
+            // 
             path[1] = token1;
             router.swapExactTokensForTokens(ba, uint256(0), path, address(this), block.timestamp.add(1800));
         }
-        // // 添加流动性
        
         uint256 token0Ba = IERC20(token0).balanceOf(address(this));
         uint256 token1Ba = IERC20(token1).balanceOf(address(this));
@@ -409,34 +404,34 @@ contract BscReInvestPool is Third {
         uint256 out=0;
         uint256 liqui=0;
         if (t0.mul(token1Ba)>token0Ba.mul(t1)){
-            // 说明 token1Ba 偏多
+        
             out = token0Ba.mul(t1).div(t0);
             if(out <= 0){
                 return;
             }
             
             (,,liqui) = router.addLiquidity(token0, token1, token0Ba, out, 0, 0, address(this), now.add(1800));
-            // 多余的下次一起复投
+ 
             // if(autoi){
             //     token1Ba = token1Ba.sub(out);
             //     if (token1Ba>0){
             //         path[0] = token1;
-            //         path[1] = address(pool.rewardToken); // 剩余换回奖励的Token 下次使用
+            //         path[1] = address(pool.rewardToken); 
             //         router.swapExactTokensForTokens(token1Ba, 0, path, address(this), block.timestamp.add(1800));
             //     }
             // }
-        } else{ // 说明token0Ba 偏多
+        } else{ //
             out = token1Ba.mul(t0).div(t1);
             if(out <= 0){
                 return;
             }
             (,,liqui) = router.addLiquidity(token0, token1, out, token1Ba, 0, 0, address(this), now.add(1800));
-            // 多余的下次一起复投
+
             // if(autoi){
             //     token0Ba = token0Ba.sub(out);
             //     if (token0Ba>0){
             //         path[0] = token0;
-            //         path[1] = address(pool.rewardToken); // 剩余换回奖励的Token 下次使用
+            //         path[1] = address(pool.rewardToken);
             //         router.swapExactTokensForTokens(token0Ba, 0, path, address(this), block.timestamp.add(10));
             //     }
             // }
@@ -454,21 +449,20 @@ contract BscReInvestPool is Third {
             return;
         }
         if(pool.lpSupply<=0){
-            // 如果当前池子质押总额为0 那么多余的反给平台
             pool.lpToken.transfer(feeaddr,ba);
             return;
         }
         // pool.lpToken.transfer(devaddr,ba);
-        kswap.deposit(pool.pid,ba);
+        thirdPool.deposit(pool.pid,ba);
     }
 
 
     // auto reinvest
     function harvest(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
-        kswap.deposit(pool.pid, 0); // 提取利息
-        calcProfit(_pid, pool,false); // 计算利息
-        futou(pool); // 进行复投
+        thirdPool.deposit(pool.pid, 0); // 
+        calcProfit(_pid, pool,false); // 
+        futou(pool); // 
         emit ReInvest(_pid);
     }
 
