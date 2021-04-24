@@ -88,14 +88,14 @@ contract BscReInvestPool is Third {
         address _devaddr,
         uint256 _RITPerBlock,
         IUniswapV2Router02 _router,
-        ICake _kswap
+        ICake _pool
     ) public {
         rit = _rit;
         feeaddr = _feeaddr;
         devaddr = _devaddr;
         RITPerBlock = _RITPerBlock;
         router = _router;
-        thirdPool = _kswap;
+        thirdPool = _pool;
     }
 
     function poolLength() external view returns (uint256) {
