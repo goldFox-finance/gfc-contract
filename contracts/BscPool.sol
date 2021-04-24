@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
@@ -91,7 +92,6 @@ contract BscPool is Third {
         address _devaddr,
         address _operationaddr,
         address _fundaddr,
-        address _institutionaddr,
         uint256 _CBAYPerBlock,
         uint256 _LockMulti,
         IUniswapV2Router02 _router
@@ -136,7 +136,7 @@ contract BscPool is Third {
         UserInfo storage user = userInfo[id][msg.sender];
         require(user.amount>0,"need deposit first");
         require(user.lockTime<=0,"has lock already");
-        user.lockTime.add(now).add(LockTime);
+        user.lockTime = user.lockTime.add(now).add(LockTime);
     }
 
     // Add a new lp to the pool. Can only be called by the owner.
@@ -189,7 +189,7 @@ contract BscPool is Third {
     }
 
     // Return reward multiplier over the given _from to _to block.
-    function getMultiplier(uint256 _from, uint256 _to) public view returns (uint256) {
+    function getMultiplier(uint256 _from, uint256 _to) public pure returns (uint256) {
         return _to.sub(_from);
     }
 

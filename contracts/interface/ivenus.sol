@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.6.12;
 // https://app.venus.io/dashboard
 interface IVenus {
     function mint(uint256 _amount) external;

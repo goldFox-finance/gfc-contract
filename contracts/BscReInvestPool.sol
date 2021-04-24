@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 import "./interface/icake.sol";
@@ -185,6 +186,17 @@ contract BscReInvestPool is Third {
         return uRIT.amount.mul(accRITPerShare).div(1e12).sub(uRIT.rewardDebt);
     }
 
+       // View function to see pending RITs on frontend.
+    function rewardLp(uint256 _pid, address _user) external view returns (uint256) {
+        PoolInfo storage pool = poolInfo[_pid];
+        URITInfo storage uRIT = uRITInfo[_pid][_user];
+        uint256 ba = getWithdrawBalance(_pid, userShares[_pid][_user], thirdPool.userInfo(pool.pid, address(this)).amount);
+        if(ba > uRIT.amount){
+            return ba.sub(uRIT.amount);
+        }
+        return 0;
+    }
+
     // View function to see pending RITs on frontend.
         // View function to see pending RITs on frontend.
     function allRewardLp(uint256 _pid) external view returns (uint256) {
@@ -284,11 +296,10 @@ contract BscReInvestPool is Third {
         if(pendingT > 0) {
             safeRITTransfer(msg.sender, pendingT);
         }
-        uint256 rewardLp = 0;
         if(_amount > 0) {
             uint256 fene = thirdPool.userInfo(pool.pid,address(this)).amount;
             uint256 _shares = getWithdrawShares(_pid, _amount, msg.sender, uRIT.amount);
-            uint256 should_withdraw = getWithdrawBalance(_pid, _shares, msg.sender, fene);
+            uint256 should_withdraw = getWithdrawBalance(_pid, _shares, fene);
             pool.lpSupply = pool.lpSupply.sub(_amount);
             uRIT.amount = uRIT.amount.sub(_amount);
             thirdPool.withdraw(pool.pid, should_withdraw); // 
@@ -327,7 +338,7 @@ contract BscReInvestPool is Third {
     }
 
     // 
-    function calcProfit(uint256 _pid,bool autoi) private{
+    function calcProfit(uint256 _pid) private{
         PoolInfo storage pool = poolInfo[_pid];
         uint256 ba = pool.rewardToken.balanceOf(address(this));
         if(ba<baseReward){
@@ -428,7 +439,7 @@ contract BscReInvestPool is Third {
     function harvest(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
         thirdPool.deposit(pool.pid, 0); // 
-        calcProfit(_pid,false); // 
+        calcProfit(_pid); // 
         futou(pool); // 
         emit ReInvest(_pid);
     }

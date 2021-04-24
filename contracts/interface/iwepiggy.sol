@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.6.12;
 // https://wepiggy.com/
 interface IWepiggy {
     function mint(uint256 _amount) external;

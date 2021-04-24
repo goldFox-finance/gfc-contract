@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 import "./interface/ivenus.sol";
@@ -185,10 +186,10 @@ contract BscSinglePool is Third {
     }
 
     // View function to see pending RITs on frontend.
-    function rewardLp(uint256 _pid, address _uRIT) external view returns (uint256) {
+    function rewardLp(uint256 _pid, address _user) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
-        URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
-        uint256 ba = getWithdrawBalance(_pid, userShares[_pid][msg.sender], msg.sender, pool.thirdAllBalance);
+        URITInfo storage uRIT = uRITInfo[_pid][_user];
+        uint256 ba = getWithdrawBalance(_pid, userShares[_pid][_user], pool.thirdAllBalance);
         if(ba > uRIT.amount){
             return ba.sub(uRIT.amount);
         }
@@ -296,7 +297,7 @@ contract BscSinglePool is Third {
         if(_amount > 0) {
             uint256 fene = pool.thirdPool.balanceOf(address(this));
             uint256 _shares = getWithdrawShares(_pid, _amount, msg.sender, uRIT.amount);
-            uint256 should_withdraw = getWithdrawBalance(_pid, _shares, msg.sender, fene);
+            uint256 should_withdraw = getWithdrawBalance(_pid, _shares, fene);
             pool.lpSupply = pool.lpSupply.sub(_amount);
             uRIT.amount = uRIT.amount.sub(_amount);
             // 

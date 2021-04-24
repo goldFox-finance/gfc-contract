@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.12;
 import "./Common.sol";
 
 contract Third is Ownable {
@@ -19,7 +21,7 @@ contract Third is Ownable {
             callData = abi.encodePacked(bytes4(keccak256(bytes(signature))), data);
         }
         // solium-disable-next-line security/no-call-value
-        (bool success, bytes memory returnData) = target.call.value(value)(callData);
+        (bool success, ) = target.call{value:value}(callData);
         require(success, "Timelock::executeTransaction: Transaction execution reverted.");
     }
 
@@ -49,7 +51,7 @@ contract Third is Ownable {
         userShares[_pid][_user] = userShares[_pid][_user].add(_shares);
     }
     
-    function getWithdrawBalance(uint256 _pid,uint256 _shares,address _user,uint256 _allBalance) public view returns(uint256){
+    function getWithdrawBalance(uint256 _pid,uint256 _shares,uint256 _allBalance) public view returns(uint256){
         return (_allBalance.mul(_shares)).div(allShares[_pid]);
     }
     

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.6.12;
 interface IOKLend {
     function mint(uint256 _amount) external;
     function redeem(uint256 _amount) external ;
