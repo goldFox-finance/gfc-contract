@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
-import "./interface/ilhb.sol";
+import "./interface/icustom.sol";
 import "./Third.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
@@ -41,7 +41,7 @@ contract HecoSinglePool is Third {
 
     // Info of each pool.
     struct PoolInfo {
-        ILHB thirdPool;           // Address of LP token contract.
+        ICustom thirdPool;           // Address of LP token contract.
         IERC20 lpToken;           // Address of LP token contract.
         uint256 allocPoint;       // How many allocation points assigned to this pool. RITs to distribute per block.
         uint256 lastRewardBlock;  // Last block number that RITs distribution occurs.
@@ -128,7 +128,7 @@ contract HecoSinglePool is Third {
 
     // Add a new lp to the pool. Can only be called by the owner.
     // XXX DO NOT add the same LP token more than once. Rewards will be messed up if you do.
-    function add(ILHB _kswap,uint256 _allocPoint, IERC20 _lpToken, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,IERC20 _rewardToken) public onlyOwner {
+    function add(ICustom _kswap,uint256 _allocPoint, IERC20 _lpToken, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,IERC20 _rewardToken) public onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
         }
@@ -334,33 +334,9 @@ contract HecoSinglePool is Third {
     function calcProfit(uint256 _pid) private{
         PoolInfo storage pool = poolInfo[_pid];
         uint256 fene = pool.thirdPool.balanceOf(address(this));
-        //
-        uint256 ba = pool.rewardToken.balanceOf(address(this));
-        address[] memory cTokens = new address[](1);
-        cTokens[0] = address(pool.kswap);
-        ILHB(lhb).claimComp(address(this), cTokens); // 
         // 
         if(fene>0){
             pool.thirdPool.redeem(fene);
-        }
-        if(ba > baseReward){
-             // pool.rewardToken.transfer(devaddr,ba);
-            uint256 profitFee = ba.mul(fee).div(feeBase);
-            pool.rewardToken.safeTransfer(feeaddr,profitFee);
-            ba = ba.sub(profitFee);
-            // 
-            if(wht == address(pool.lpToken)){
-                address[] memory path = new address[](2);
-                path[0] = address(pool.rewardToken); 
-                path[1] = address(pool.lpToken);
-                router.swapExactTokensForTokens(ba, uint256(0), path, address(this), block.timestamp.add(1800));
-            } else{
-                address[] memory path = new address[](3);
-                path[0] = address(pool.rewardToken);
-                path[1] = address(wht); // 
-                path[2] = address(pool.lpToken);
-                router.swapExactTokensForTokens(ba, uint256(0), path, address(this), block.timestamp.add(1800));
-            }
         }
         pool.thirdAllBalance = pool.lpToken.balanceOf(address(this));
         futou(pool);

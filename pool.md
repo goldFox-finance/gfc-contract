@@ -52,7 +52,7 @@ lp.approve(r.address,"1006038761521000000000000")
 r.GetPoolInfo(0)
 r.GetURITInfo(0,accounts[0])
 // 27043537816513
-r.deposit(0,"3134473711591")
+r.deposit(0,"3134533398377")
 r.withdraw(0,"270435378165")
 r.harvest(0)
 
@@ -110,7 +110,7 @@ c.balanceOf.call(r.address).then(function(a){console.log(a.toString())})
 HecoSinglePool.deployed().then(function(c){s=c});
 
 // usdc
-Common.at("0xe579156f9decc4134b5e3a30a24ac46bb8b01281").then(function(c1){u=c1});
+Common.at("0x92ad00a4a2a6eea1701464fdb86e9f318bbe423d").then(function(c1){u=c1});
 
 
 // husd 0x0298c2b32eae4da002a15f36fdf7615bea3da047
