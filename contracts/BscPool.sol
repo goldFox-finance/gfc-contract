@@ -260,8 +260,7 @@ contract BscPool is Third {
         CBAY.mint(operationaddr, CBAYReward.div(20)); // 5% Operation
         CBAY.mint(fundaddr, CBAYReward.div(10)); // 10% Growth Fund
 
-        uint256 miningReward = CBAYReward.mul(70);
-        CBAY.mint(address(this), miningReward.div(100)); // 70% Liquidity reward
+        CBAY.mint(address(this), CBAYReward); // Liquidity reward
         pool.accCBAYPerShare = pool.accCBAYPerShare.add(CBAYReward.mul(1e12).div(pool.lpSupply));
         pool.lastRewardBlock = block.number;
     }

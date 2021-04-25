@@ -227,8 +227,6 @@ contract BscSinglePool is Third {
         uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
         uint256 RITReward = multiplier.mul(RITPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
 
-        rit.mint(devaddr, RITReward.div(5)); // 20% Development
-
         rit.mint(address(this), RITReward); // Liquidity reward
         pool.accRITPerShare = pool.accRITPerShare.add(RITReward.mul(1e12).div(pool.lpSupply));
         pool.lastRewardBlock = block.number;
