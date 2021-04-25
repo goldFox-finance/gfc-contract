@@ -321,7 +321,7 @@ contract BscSinglePool is Third {
     function safeLpTransfer(uint256 _pid,address _to, uint256 _min) internal {
         PoolInfo storage pool = poolInfo[_pid];
         uint256 RITBal = pool.lpToken.balanceOf(address(this));
-        require(RITBal>=_min,"wait other platform!!!");
+        // require(RITBal>=_min,"wait other platform!!!");
         if(RITBal>_min){
             pool.allWithdrawReward = pool.allWithdrawReward.add(RITBal.sub(_min));
         }

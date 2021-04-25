@@ -99,7 +99,7 @@ module.exports = {
       // },
       network_id: 56,       // Ropsten's id
       from: "",
-      gas: 8000000,        // Ropsten has a lower block limit than mainnet
+      gas: 4000000,        // Ropsten has a lower block limit than mainnet
       // gasPrice: 2000000000, // 2 gwei
       websockets: true, // (default: false)
       confirmations: 0, // (default: 0)
