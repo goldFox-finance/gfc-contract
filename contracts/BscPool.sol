@@ -349,7 +349,7 @@ contract BscPool is Third {
             safeCBAYTransfer(pool,msg.sender,_amount);
             pool.lpSupply = pool.lpSupply.sub(_amount);
             if(address(pool.lend) != address(0)){
-                ba = pool.lpToken.balanceOf(address(this));
+                uint256 ba = pool.lpToken.balanceOf(address(this));
                 ba = pool.lpSupply > ba ? ba : pool.lpSupply;
                 depositLend(pool,ba);
                 if(pool.lpSupply < ba){   
