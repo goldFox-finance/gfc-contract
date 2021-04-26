@@ -10,5 +10,5 @@ interface IVenus {
     function getCash() external view returns(uint256);
     function totalSupply() external view returns(uint256);
     function totalBorrows() external view returns(uint256);
-    function getAccountSnapshot(address _account) public view returns(uint256,uint256,uint256,uint256);
+    function getAccountSnapshot(address _account) external view returns(uint256,uint256,uint256,uint256);
 }
