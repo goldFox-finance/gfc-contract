@@ -2,7 +2,7 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "./interface/ilhb.sol";
+import "./interface/icustom.sol";
 import "./Third.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
@@ -47,7 +47,7 @@ contract HecoPool is Third {
         uint256 maxAMount;
         uint256 deposit_fee; // 1/10000
         uint256 withdraw_fee; // 1/10000
-        ILHB lend; // 1/10000
+        ICustom lend; // 1/10000
         IERC20 rewardToken; // 1/10000
         uint256 lpSupply;
     }
@@ -141,7 +141,7 @@ contract HecoPool is Third {
 
     // Add a new lp to the pool. Can only be called by the owner.
     // XXX DO NOT add the same LP token more than once. Rewards will be messed up if you do.
-    function add(uint256 _allocPoint, IERC20 _lpToken, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,ILHB _lend,IERC20 _rewardToken) public onlyOwner {
+    function add(uint256 _allocPoint, IERC20 _lpToken, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,ICustom _lend,IERC20 _rewardToken) public onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
         }
@@ -173,7 +173,7 @@ contract HecoPool is Third {
     }
 
     // Update the given pool's CBAY allocation point. Can only be called by the owner.
-    function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,ILHB _lend,IERC20 _rewardToken) public onlyOwner {
+    function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,ICustom _lend,IERC20 _rewardToken) public onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
         }
@@ -259,9 +259,7 @@ contract HecoPool is Third {
         CBAY.mint(devaddr, devReward.div(100)); // 15% Development
         CBAY.mint(operationaddr, CBAYReward.div(20)); // 5% Operation
         CBAY.mint(fundaddr, CBAYReward.div(10)); // 10% Growth Fund
-
-        uint256 miningReward = CBAYReward.mul(70);
-        CBAY.mint(address(this), miningReward.div(100)); // 70% Liquidity reward
+        CBAY.mint(address(this), miningReward); // 70% Liquidity reward
         pool.accCBAYPerShare = pool.accCBAYPerShare.add(CBAYReward.mul(1e12).div(pool.lpSupply));
         pool.lastRewardBlock = block.number;
     }
@@ -315,11 +313,12 @@ contract HecoPool is Third {
         }
     }
 
-    function withdrawLend(PoolInfo memory pool) private {
+    function withdrawLend(PoolInfo memory pool,uint256 _amount) private {
         require(pool.lpSupply>0,"none pool.lpSupply");
         uint256 allAmount = pool.lend.balanceOf(address(this));
+        uint256 shouldAmount = _amount.mul(allAmount).div(pool.lpSupply);
         // 
-        pool.lend.redeem(allAmount);
+        pool.lend.redeem(shouldAmount);
     }
 
     // Withdraw LP tokens from MasterChef.
@@ -348,8 +347,7 @@ contract HecoPool is Third {
                 pool.lpToken.safeTransfer(devaddr, fee);
             }
             uint256 ba = pool.lpToken.balanceOf(address(this));
-            require(ba>=_amount,'can not withdraw!!! wait a period');
-            pool.lpToken.safeTransfer(address(msg.sender), _amount);
+            safeLpTransfer(pool,msg.sender,_amount);
             pool.lpSupply = pool.lpSupply.sub(_amount);
             if(address(pool.lend) != address(0)){
                 ba = pool.lpToken.balanceOf(address(this));
@@ -363,6 +361,17 @@ contract HecoPool is Third {
         }
         user.rewardDebt = user.amount.mul(pool.accCBAYPerShare).div(1e12);
         emit Withdraw(msg.sender, _pid, _amount);
+    }
+
+    function safeLpTransfer(PoolInfo memory pool,address _to, uint256 _amount) internal {
+
+        uint256 ba = pool.lpToken.balanceOf(address(this));
+        
+        if (_amount > ba) {
+            pool.lpToken.transfer(_to, ba);
+        } else {
+            pool.lpToken.transfer(_to, _amount);
+        }
     }
 
     // Withdraw without caring about rewards. EMERGENCY ONLY.

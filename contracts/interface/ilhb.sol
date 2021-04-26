@@ -5,4 +5,5 @@ interface ILHB {
     function redeem(uint256 _amount) external ;
     function balanceOf(address _account) external view returns(uint256);
     function claimComp(address holder, address[] memory cTokens) external;
+    function getAccountSnapshot(address _account) external view returns(uint256,uint256,uint256,uint256);
 }

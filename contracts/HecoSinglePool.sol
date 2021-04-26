@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
-import "./interface/icustom.sol";
+import "./interface/ilhb.sol";
 import "./Third.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
@@ -19,7 +19,7 @@ contract HecoSinglePool is Third {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     IUniswapV2Router02 public router;
-    address public lhb = 0x6537d6307ca40231939985BCF7D83096Dd1B4C09; // lendhub 
+    address public lhb = 0x6537d6307ca40231939985BCF7D83096Dd1B4C09; // lendhub 收取收益的合约地址
     address public wht = 0x5545153CCFcA01fbd7Dd11C0b23ba694D9509A6F;
     // Info of each uRIT.
     struct URITInfo {
@@ -41,7 +41,7 @@ contract HecoSinglePool is Third {
 
     // Info of each pool.
     struct PoolInfo {
-        ICustom thirdPool;           // Address of LP token contract.
+        ILHB thirdPool;           // Address of LP token contract.
         IERC20 lpToken;           // Address of LP token contract.
         uint256 allocPoint;       // How many allocation points assigned to this pool. RITs to distribute per block.
         uint256 lastRewardBlock;  // Last block number that RITs distribution occurs.
@@ -53,7 +53,6 @@ contract HecoSinglePool is Third {
         uint256 deposit_fee; // 1/10000
         uint256 withdraw_fee; // 1/10000
         uint256 allWithdrawReward;
-        uint256 thirdAllBalance;
     }
     uint256 public baseReward = 0;
     // The RIT TOKEN!
@@ -73,7 +72,7 @@ contract HecoSinglePool is Third {
     mapping (uint256 => mapping (address => URITInfo)) public uRITInfo;
     // Total allocation poitns. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
-    uint256 public fee = 1; // 1% of profit
+    uint256 public fee = 30; // 30% of profit
     uint256 public feeBase = 100; // 1% of profit
 
     event Deposit(address indexed uRIT, uint256 indexed pid, uint256 amount);
@@ -128,7 +127,7 @@ contract HecoSinglePool is Third {
 
     // Add a new lp to the pool. Can only be called by the owner.
     // XXX DO NOT add the same LP token more than once. Rewards will be messed up if you do.
-    function add(ICustom _kswap,uint256 _allocPoint, IERC20 _lpToken, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,IERC20 _rewardToken) public onlyOwner {
+    function add(ILHB _kswap,uint256 _allocPoint, IERC20 _lpToken, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,IERC20 _rewardToken) public onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
         }
@@ -146,8 +145,7 @@ contract HecoSinglePool is Third {
             lpSupply:0,
             deposit_fee:_deposit_fee,
             withdraw_fee:_withdraw_fee,
-            allWithdrawReward:0,
-            thirdAllBalance:0
+            allWithdrawReward:0
         }));
         approve(poolInfo[poolInfo.length-1]);
         emit SetPool(poolInfo.length-1 , address(_lpToken), _allocPoint, _min, _max);
@@ -187,14 +185,23 @@ contract HecoSinglePool is Third {
         return uRIT.amount.mul(accRITPerShare).div(1e12).sub(uRIT.rewardDebt);
     }
 
+    function balanceOfUnderlying(PoolInfo memory pool) public view returns (uint256){
+        (,uint256 ba,,uint256 exchangerate) = pool.thirdPool.getAccountSnapshot(address(this));
+        if(ba <=0){
+            return 0;
+        }
+        return ba.mul(exchangerate).div(1e18);
+    }
+
     // View function to see pending RITs on frontend.
     function rewardLp(uint256 _pid, address _user) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][_user];
-        if(pool.thirdAllBalance <=0){
+        uint256 thirdAllBalance = balanceOfUnderlying(pool);
+        if(thirdAllBalance <= 0){
             return 0;
         }
-        uint256 ba = getWithdrawBalance(_pid, userShares[_pid][_user], pool.thirdAllBalance);
+        uint256 ba = getWithdrawBalance(_pid, userShares[_pid][_user], thirdAllBalance);
         if(ba > uRIT.amount){
             return ba.sub(uRIT.amount);
         }
@@ -204,7 +211,11 @@ contract HecoSinglePool is Third {
     // View function to see pending RITs on frontend.
     function allRewardLp(uint256 _pid) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
-        return pool.allWithdrawReward.add(pool.thirdAllBalance.sub(pool.lpSupply));
+        uint256 thirdAllBalance = balanceOfUnderlying(pool);
+        if(thirdAllBalance <= pool.lpSupply){
+            return 0;
+        }
+        return pool.allWithdrawReward.add(thirdAllBalance.sub(pool.lpSupply));
     }
 
     // Update reward variables for all pools. Be careful of gas spending!
@@ -228,8 +239,6 @@ contract HecoSinglePool is Third {
         }
         uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
         uint256 RITReward = multiplier.mul(RITPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
-
-        rit.mint(devaddr, RITReward.div(5)); // 20% Development
 
         rit.mint(address(this), RITReward); // Liquidity reward
         pool.accRITPerShare = pool.accRITPerShare.add(RITReward.mul(1e12).div(pool.lpSupply));
@@ -273,8 +282,7 @@ contract HecoSinglePool is Third {
             }
             uint256 _after = pool.thirdPool.balanceOf(address(this));
             pool.lpSupply = pool.lpSupply.add(_amount);
-            _mint(_pid, _after.sub(_before), msg.sender, _before);
-            pool.thirdAllBalance = pool.thirdAllBalance.add(_amount);
+            _mint(_pid, _after.sub(_before), msg.sender, _after);
         }
         uRIT.rewardDebt = uRIT.amount.mul(pool.accRITPerShare).div(1e12);
         emit Deposit(msg.sender, _pid, _amount);
@@ -323,7 +331,7 @@ contract HecoSinglePool is Third {
     function safeLpTransfer(uint256 _pid,address _to, uint256 _min) internal {
         PoolInfo storage pool = poolInfo[_pid];
         uint256 RITBal = pool.lpToken.balanceOf(address(this));
-        require(RITBal>=_min,"wait other platform!!!");
+        // require(RITBal>=_min,"wait other platform!!!");
         if(RITBal>_min){
             pool.allWithdrawReward = pool.allWithdrawReward.add(RITBal.sub(_min));
         }
@@ -333,12 +341,32 @@ contract HecoSinglePool is Third {
     // 
     function calcProfit(uint256 _pid) private{
         PoolInfo storage pool = poolInfo[_pid];
-        uint256 fene = pool.thirdPool.balanceOf(address(this));
+        address[] memory cTokens = new address[](1);
+        cTokens[0] = address(pool.thirdPool);
+        ILHB(lhb).claimComp(address(this), cTokens); // 提出利息
         // 
-        if(fene>0){
-            pool.thirdPool.redeem(fene);
+        pool.thirdPool.redeem(0);
+        uint256 ba = pool.rewardToken.balanceOf(address(this));
+      
+        if(ba > baseReward){
+            // pool.rewardToken.transfer(devaddr,ba);
+            uint256 profitFee = ba.mul(fee).div(feeBase);
+            pool.rewardToken.safeTransfer(feeaddr,profitFee);
+            ba = ba.sub(profitFee);
+            // 剩余换成本币当利息 LHB 
+            if(wht == address(pool.lpToken)){
+                address[] memory path = new address[](2);
+                path[0] = address(pool.rewardToken); 
+                path[1] = address(pool.lpToken);
+                router.swapExactTokensForTokens(ba, uint256(0), path, address(this), block.timestamp.add(1800));
+            } else{
+                address[] memory path = new address[](3);
+                path[0] = address(pool.rewardToken);
+                path[1] = address(wht); // 中间通过WHT路由
+                path[2] = address(pool.lpToken);
+                router.swapExactTokensForTokens(ba, uint256(0), path, address(this), block.timestamp.add(1800));
+            }
         }
-        pool.thirdAllBalance = pool.lpToken.balanceOf(address(this));
         futou(pool);
     }
 

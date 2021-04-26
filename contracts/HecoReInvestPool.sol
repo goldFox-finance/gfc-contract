@@ -72,7 +72,7 @@ contract HecoReInvestPool is Third {
     mapping (uint256 => mapping (address => URITInfo)) public uRITInfo;
     // Total allocation poitns. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
-    uint256 public fee = 1; // 1% of profit
+    uint256 public fee = 30; // 30% of profit
     uint256 public feeBase = 100; // 1% of profit
 
     event Deposit(address indexed uRIT, uint256 indexed pid, uint256 amount);
@@ -190,7 +190,7 @@ contract HecoReInvestPool is Third {
     function rewardLp(uint256 _pid, address _user) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][_user];
-        if(thirdPool.userInfo(pool.pid, address(this)).amount <=0){
+        if(thirdPool.userInfo(pool.pid, address(this)).amount <= 0){
             return 0;
         }
         uint256 ba = getWithdrawBalance(_pid, userShares[_pid][_user], thirdPool.userInfo(pool.pid, address(this)).amount);
@@ -204,6 +204,9 @@ contract HecoReInvestPool is Third {
         // View function to see pending RITs on frontend.
     function allRewardLp(uint256 _pid) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
+        if(thirdPool.userInfo(pool.pid, address(this)).amount<=pool.lpSupply){
+            return 0;
+        }
         return pool.allWithdrawReward.add(thirdPool.userInfo(pool.pid, address(this)).amount.sub(pool.lpSupply));
     }
 
@@ -228,8 +231,6 @@ contract HecoReInvestPool is Third {
         }
         uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
         uint256 RITReward = multiplier.mul(RITPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
-
-        rit.mint(devaddr, RITReward.div(5)); // 20% Development
 
         rit.mint(address(this), RITReward); // Liquidity reward
         pool.accRITPerShare = pool.accRITPerShare.add(RITReward.mul(1e12).div(pool.lpSupply));
