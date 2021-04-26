@@ -268,7 +268,7 @@ contract BscReInvestPool is Third {
             }
             uint256 _after = thirdPool.userInfo(pool.pid,address(this)).amount;
             pool.lpSupply = pool.lpSupply.add(_amount);
-            _mint(_pid, _after.sub(_before), msg.sender, _after);
+            _mint(_pid, _after.sub(_before), msg.sender, _before);
         }
         uRIT.rewardDebt = uRIT.amount.mul(pool.accRITPerShare).div(1e12);
         emit Deposit(msg.sender, _pid, _amount);
