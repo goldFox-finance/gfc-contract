@@ -273,7 +273,7 @@ contract HecoSinglePool is Third {
             }
             uint256 _after = pool.thirdPool.balanceOf(address(this));
             pool.lpSupply = pool.lpSupply.add(_amount);
-            _mint(_pid, _after.sub(_before), msg.sender, _after);
+            _mint(_pid, _after.sub(_before), msg.sender, _before);
             pool.thirdAllBalance = pool.thirdAllBalance.add(_amount);
         }
         uRIT.rewardDebt = uRIT.amount.mul(pool.accRITPerShare).div(1e12);
