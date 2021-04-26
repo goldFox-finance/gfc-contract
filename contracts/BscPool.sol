@@ -314,16 +314,16 @@ contract BscPool is Third {
         }
     }
 
-    function withdrawLend(PoolInfo memory pool) private {
+    function withdrawLend(PoolInfo memory pool,uint256 _amount) private {
         require(pool.lpSupply>0,"none pool.lpSupply");
         uint256 allAmount = pool.lend.balanceOf(address(this));
+        uint256 shouldAmount = _amount.mul(allAmount).div(pool.lpSupply);
         // 
-        pool.lend.redeem(allAmount);
+        pool.lend.redeem(shouldAmount);
     }
 
     // Withdraw LP tokens from MasterChef.
     function withdraw(uint256 _pid, uint256 _amount) public {
-        
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
@@ -338,7 +338,7 @@ contract BscPool is Third {
         if(_amount > 0) {
             require(user.lockTime<=now,"mining in lock,can not withdraw");
             if(address(pool.lend) != address(0)){
-                withdrawLend( pool);
+                withdrawLend( pool,_amount);
             }
             user.amount = user.amount.sub(_amount);
             if(pool.withdraw_fee>0){
@@ -346,9 +346,7 @@ contract BscPool is Third {
                 _amount = _amount.sub(fee);
                 pool.lpToken.safeTransfer(devaddr, fee);
             }
-            uint256 ba = pool.lpToken.balanceOf(address(this));
-            require(ba>=_amount,'can not withdraw!!! wait a period');
-            pool.lpToken.safeTransfer(address(msg.sender), _amount);
+            safeCBAYTransfer(pool,msg.sender,_amount);
             pool.lpSupply = pool.lpSupply.sub(_amount);
             if(address(pool.lend) != address(0)){
                 ba = pool.lpToken.balanceOf(address(this));
@@ -362,6 +360,18 @@ contract BscPool is Third {
         }
         user.rewardDebt = user.amount.mul(pool.accCBAYPerShare).div(1e12);
         emit Withdraw(msg.sender, _pid, _amount);
+    }
+
+       // Safe CBAY transfer function, just in case if rounding error causes pool to not have enough CBAYs.
+    function safeCBAYTransfer(PoolInfo memory pool, address _to, uint256 _amount) internal {
+
+        uint256 ba = pool.lpToken.balanceOf(address(this));
+        
+        if (_amount > ba) {
+            pool.lpToken.transfer(_to, ba);
+        } else {
+            pool.lpToken.transfer(_to, _amount);
+        }
     }
 
     // Withdraw without caring about rewards. EMERGENCY ONLY.
