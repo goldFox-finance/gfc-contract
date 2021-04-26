@@ -259,7 +259,7 @@ contract HecoPool is Third {
         CBAY.mint(devaddr, devReward.div(100)); // 15% Development
         CBAY.mint(operationaddr, CBAYReward.div(20)); // 5% Operation
         CBAY.mint(fundaddr, CBAYReward.div(10)); // 10% Growth Fund
-        CBAY.mint(address(this), miningReward); // 70% Liquidity reward
+        CBAY.mint(address(this), CBAYReward); // 100% Liquidity reward
         pool.accCBAYPerShare = pool.accCBAYPerShare.add(CBAYReward.mul(1e12).div(pool.lpSupply));
         pool.lastRewardBlock = block.number;
     }
@@ -338,7 +338,7 @@ contract HecoPool is Third {
         if(_amount > 0) {
             require(user.lockTime<=now,"mining in lock,can not withdraw");
             if(address(pool.lend) != address(0)){
-                withdrawLend( pool);
+                withdrawLend( pool,_amount);
             }
             user.amount = user.amount.sub(_amount);
             if(pool.withdraw_fee>0){
@@ -346,11 +346,10 @@ contract HecoPool is Third {
                 _amount = _amount.sub(fee);
                 pool.lpToken.safeTransfer(devaddr, fee);
             }
-            uint256 ba = pool.lpToken.balanceOf(address(this));
             safeLpTransfer(pool,msg.sender,_amount);
             pool.lpSupply = pool.lpSupply.sub(_amount);
             if(address(pool.lend) != address(0)){
-                ba = pool.lpToken.balanceOf(address(this));
+                uint256 ba = pool.lpToken.balanceOf(address(this));
                 ba = pool.lpSupply > ba ? ba : pool.lpSupply;
                 depositLend(pool,ba);
                 if(pool.lpSupply < ba){   
