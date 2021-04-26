@@ -51,7 +51,6 @@ contract BscSinglePool is Third {
         uint256 deposit_fee; // 1/10000
         uint256 withdraw_fee; // 1/10000
         uint256 allWithdrawReward;
-        uint256 thirdAllBalance;
     }
     uint256 public baseReward = 0;
     // The RIT TOKEN!
@@ -71,7 +70,7 @@ contract BscSinglePool is Third {
     mapping (uint256 => mapping (address => URITInfo)) public uRITInfo;
     // Total allocation poitns. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
-    uint256 public fee = 1; // 1% of profit
+    uint256 public fee = 30; // 30% of profit
     uint256 public feeBase = 100; // 1% of profit
 
     event Deposit(address indexed uRIT, uint256 indexed pid, uint256 amount);
@@ -144,8 +143,7 @@ contract BscSinglePool is Third {
             lpSupply:0,
             deposit_fee:_deposit_fee,
             withdraw_fee:_withdraw_fee,
-            allWithdrawReward:0,
-            thirdAllBalance:0
+            allWithdrawReward:0
         }));
         approve(poolInfo[poolInfo.length-1]);
         emit SetPool(poolInfo.length-1 , address(_lpToken), _allocPoint, _min, _max);
@@ -185,14 +183,23 @@ contract BscSinglePool is Third {
         return uRIT.amount.mul(accRITPerShare).div(1e12).sub(uRIT.rewardDebt);
     }
 
+    function balanceOfUnderlying(PoolInfo memory pool) public view returns (uint256){
+        (,uint256 ba,,uint256 exchangerate) = pool.thirdPool.getAccountSnapshot(address(this));
+        if(ba <=0){
+            return 0;
+        }
+        return ba.mul(exchangerate).div(1e18);
+    }
+
     // View function to see pending RITs on frontend.
     function rewardLp(uint256 _pid, address _user) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][_user];
-        if(pool.thirdAllBalance <= 0){
+        uint256 thirdAllBalance = balanceOfUnderlying(pool);
+        if(thirdAllBalance <= 0){
             return 0;
         }
-        uint256 ba = getWithdrawBalance(_pid, userShares[_pid][_user], pool.thirdAllBalance);
+        uint256 ba = getWithdrawBalance(_pid, userShares[_pid][_user], thirdAllBalance);
         if(ba > uRIT.amount){
             return ba.sub(uRIT.amount);
         }
@@ -202,7 +209,11 @@ contract BscSinglePool is Third {
     // View function to see pending RITs on frontend.
     function allRewardLp(uint256 _pid) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
-        return pool.allWithdrawReward.add(pool.thirdAllBalance.sub(pool.lpSupply));
+        uint256 thirdAllBalance = balanceOfUnderlying(pool);
+        if(thirdAllBalance <= pool.lpSupply){
+            return 0;
+        }
+        return pool.allWithdrawReward.add(thirdAllBalance.sub(pool.lpSupply));
     }
 
     // Update reward variables for all pools. Be careful of gas spending!
@@ -270,7 +281,6 @@ contract BscSinglePool is Third {
             uint256 _after = pool.thirdPool.balanceOf(address(this));
             pool.lpSupply = pool.lpSupply.add(_amount);
             _mint(_pid, _after.sub(_before), msg.sender, _after);
-            pool.thirdAllBalance = pool.thirdAllBalance.add(_amount);
         }
         uRIT.rewardDebt = uRIT.amount.mul(pool.accRITPerShare).div(1e12);
         emit Deposit(msg.sender, _pid, _amount);
@@ -329,9 +339,8 @@ contract BscSinglePool is Third {
     // 
     function calcProfit(uint256 _pid) private{
         PoolInfo storage pool = poolInfo[_pid];
-        uint256 fene = pool.thirdPool.balanceOf(address(this));
         // 
-        pool.thirdPool.redeem(fene);
+        pool.thirdPool.redeem(0);
         uint256 ba = pool.rewardToken.balanceOf(address(this));
       
         if(ba > baseReward){
@@ -344,7 +353,6 @@ contract BscSinglePool is Third {
             path[1] = address(pool.lpToken);
             router.swapExactTokensForTokens(ba, uint256(0), path, address(this), block.timestamp.add(1800));
         }
-        pool.thirdAllBalance = pool.lpToken.balanceOf(address(this));
         futou(pool);
     }
 

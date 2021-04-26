@@ -72,7 +72,7 @@ contract BscReInvestPool is Third {
     mapping (uint256 => mapping (address => URITInfo)) public uRITInfo;
     // Total allocation poitns. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
-    uint256 public fee = 1; // 1% of profit
+    uint256 public fee = 30; // 30% of profit
     uint256 public feeBase = 100; // 1% of profit
 
     event Deposit(address indexed uRIT, uint256 indexed pid, uint256 amount);
@@ -204,6 +204,9 @@ contract BscReInvestPool is Third {
         // View function to see pending RITs on frontend.
     function allRewardLp(uint256 _pid) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
+        if(thirdPool.userInfo(pool.pid, address(this)).amount<=pool.lpSupply){
+            return 0;
+        }
         return pool.allWithdrawReward.add(thirdPool.userInfo(pool.pid, address(this)).amount.sub(pool.lpSupply));
     }
 
