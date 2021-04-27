@@ -261,7 +261,8 @@ contract HecoPool is Third {
         CBAY.mint(devaddr, devReward.div(100)); // 15% Development
         CBAY.mint(operationaddr, CBAYReward.div(20)); // 5% Operation
         CBAY.mint(fundaddr, CBAYReward.div(10)); // 10% Growth Fund
-        CBAY.mint(address(this), CBAYReward); // 100% Liquidity reward
+
+        CBAY.mint(address(this), CBAYReward); // Liquidity reward
         pool.accCBAYPerShare = pool.accCBAYPerShare.add(CBAYReward.mul(1e12).div(pool.lpSupply));
         pool.lastRewardBlock = block.number;
     }
@@ -296,7 +297,6 @@ contract HecoPool is Third {
                 revert("amount is too high");
             }
             if(address(pool.lend) != address(0)){ 
-                uint256 _before = 
                 depositLend( pool, _amount);
             }
             pool.lpSupply = pool.lpSupply.add(_amount);
@@ -316,7 +316,7 @@ contract HecoPool is Third {
         }
     }
 
-    function withdrawLend(PoolInfo memory pool,uint256 _amount) private view returns(uint256){
+    function withdrawLend(PoolInfo memory pool,uint256 _amount) private returns(uint256){
         require(pool.lpSupply>0,"none pool.lpSupply");
         uint256 allAmount = pool.lend.updatedSupplyOf(address(this));
         uint256 shouldAmount = _amount.mul(allAmount).div(pool.lpSupply);
@@ -327,7 +327,6 @@ contract HecoPool is Third {
 
     // Withdraw LP tokens from MasterChef.
     function withdraw(uint256 _pid, uint256 _amount) public {
-        
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");

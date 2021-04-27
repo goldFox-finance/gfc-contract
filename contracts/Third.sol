@@ -15,6 +15,7 @@ contract Third is Ownable {
     address public USDT = 0xa71EdC38d189767582C38A3145b5873052c3e47a;
     address public ETH = 0x64FF637fB478863B7468bc97D30a5bF3A428a1fD;
     address public HFIL = 0xae3a768f9aB104c69A7CD6041fE16fFa235d1810;
+
     function setPause(uint256 _pause) public onlyOwner{
         pause = _pause;
     }

@@ -92,6 +92,7 @@ contract HecoSinglePool is Third {
         feeaddr = _feeaddr;
         RITPerBlock = _RITPerBlock;
         router = _router;
+        initRouters();
     }
 
     function poolLength() external view returns (uint256) {
@@ -280,7 +281,7 @@ contract HecoSinglePool is Third {
             }
             uint256 _after = pool.thirdPool.balanceOf(address(this));
             pool.lpSupply = pool.lpSupply.add(_amount);
-            _mint(_pid, _after.sub(_before), msg.sender, _after);
+            _mint(_pid, _after.sub(_before), msg.sender, _before);
         }
         uRIT.rewardDebt = uRIT.amount.mul(pool.accRITPerShare).div(1e12);
         emit Deposit(msg.sender, _pid, _amount);
@@ -351,7 +352,7 @@ contract HecoSinglePool is Third {
             uint256 profitFee = ba.mul(fee).div(feeBase);
             pool.rewardToken.safeTransfer(feeaddr,profitFee);
             ba = ba.sub(profitFee);
-            swap(router, address(pool.rewardToken), address(pool.lpToken), ba);
+            swap(router, address(pool.rewardToken),address(pool.lpToken), ba);
         }
         futou(pool);
     }
