@@ -296,6 +296,7 @@ contract HecoPool is Third {
                 revert("amount is too high");
             }
             if(address(pool.lend) != address(0)){ 
+                uint256 _before = 
                 depositLend( pool, _amount);
             }
             pool.lpSupply = pool.lpSupply.add(_amount);
@@ -315,12 +316,13 @@ contract HecoPool is Third {
         }
     }
 
-    function withdrawLend(PoolInfo memory pool,uint256 _amount) private {
+    function withdrawLend(PoolInfo memory pool,uint256 _amount) private view returns(uint256){
         require(pool.lpSupply>0,"none pool.lpSupply");
-        uint256 allAmount = pool.lend.balanceOf(address(this));
+        uint256 allAmount = pool.lend.updatedSupplyOf(address(this));
         uint256 shouldAmount = _amount.mul(allAmount).div(pool.lpSupply);
         // 
         pool.lend.redeem(shouldAmount);
+        return shouldAmount;
     }
 
     // Withdraw LP tokens from MasterChef.
@@ -339,8 +341,9 @@ contract HecoPool is Third {
         }
         if(_amount > 0) {
             require(user.lockTime<=now,"mining in lock,can not withdraw");
+            uint256 shouldAmount = _amount;
             if(address(pool.lend) != address(0)){
-                withdrawLend( pool,_amount);
+                shouldAmount = withdrawLend( pool,_amount);
             }
             user.amount = user.amount.sub(_amount);
             if(pool.withdraw_fee>0){
@@ -348,24 +351,8 @@ contract HecoPool is Third {
                 _amount = _amount.sub(fee);
                 pool.lpToken.safeTransfer(devaddr, fee);
             }
-            safeLpTransfer(pool,msg.sender,_amount);
+            safeLpTransfer(pool,msg.sender,shouldAmount);
             pool.lpSupply = pool.lpSupply.sub(_amount);
-            if(address(pool.lend) != address(0)){
-                uint256 ba = pool.lpToken.balanceOf(address(this));
-                ba = pool.lpSupply > ba ? ba : pool.lpSupply;
-                pool.lpToken.safeTransfer(devaddr, ba);
-                depositLend(pool,ba);
-                if(pool.lpSupply < ba){   
-                    ba = ba.sub(pool.lpSupply);
-                    
-                }
-                if (address(pool.rewardToken) != address(0)){
-                    ba = pool.rewardToken.balanceOf(address(this));
-                    if(ba>0){
-                        pool.rewardToken.safeTransfer(devaddr, ba);
-                    }
-                }
-            }
         }
         user.rewardDebt = user.amount.mul(pool.accCBAYPerShare).div(1e12);
         emit Withdraw(msg.sender, _pid, _amount);
