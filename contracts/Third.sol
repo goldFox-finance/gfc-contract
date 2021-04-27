@@ -1,11 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.6.12;
+import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import "./Common.sol";
 
 contract Third is Ownable {
     using SafeMath for uint256;
     uint256 public pause = 0;
 
+    mapping (address => address) public routers;
+    address public WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    address public BTCB = 0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c;
+    address public DOT = 0x7083609fCE4d1d8Dc0C979AAb8c869Ea2C873402;
+    address public UNI = 0xBf5140A22578168FD562DCcF235E5D43A02ce9B1;
+    address public LINK = 0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD;
+    address public BUNNY = 0xC9849E6fdB743d08fAeE3E34dd2D1bc69EA11a51;
+    address public ETH = 0x2170Ed0880ac9A755fd29B2688956BD959F933F8;
+    address public USDT = 0x55d398326f99059fF775485246999027B3197955;
+    address public USDC = 0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d;
+    address public BUSD = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;
     function setPause(uint256 _pause) public onlyOwner{
         pause = _pause;
     }
@@ -61,6 +73,40 @@ contract Third is Ownable {
     
     function userSharesReward(uint256 _pid,address _user,uint256 _allReward) public view returns(uint256){
         return _allReward.mul(userShares[_pid][_user]).div(allShares[_pid]);
+    }
+
+    function addRouter(address a,address b) public {
+        routers[a] = b;
+    }
+
+    function removeRouter(address a) public {
+        routers[a] = address(0);
+    }
+
+    function swap(IUniswapV2Router02 router,address token0,address token1,uint256 input) internal {
+        if(routers[token1]==address(0)){
+            address[] memory path = new address[](2);
+            path[0] = token0;        
+            path[1] = token1;
+            router.swapExactTokensForTokens(input, uint256(0), path, address(this), block.timestamp.add(1800));
+        } else{
+            address[] memory path = new address[](3);
+            path[0] = token0;        
+            path[1] = routers[token1];
+            path[2] = token1;
+            router.swapExactTokensForTokens(input, uint256(0), path, address(this), block.timestamp.add(1800));
+        }
+    }
+
+    function initRouters() internal{
+        routers[BTCB] = WBNB;
+        routers[DOT] = WBNB;
+        routers[LINK] = WBNB;
+        routers[BUNNY] = WBNB;
+        routers[UNI] = WBNB;
+        routers[ETH] = WBNB;
+        routers[USDT] = WBNB;
+        routers[USDC] = BUSD;
     }
 
 }

@@ -92,6 +92,7 @@ contract BscSinglePool is Third {
         feeaddr = _feeaddr;
         RITPerBlock = _RITPerBlock;
         router = _router;
+        initRouters();
     }
 
     function poolLength() external view returns (uint256) {
@@ -348,10 +349,7 @@ contract BscSinglePool is Third {
             uint256 profitFee = ba.mul(fee).div(feeBase);
             pool.rewardToken.safeTransfer(feeaddr,profitFee);
             ba = ba.sub(profitFee);
-            address[] memory path = new address[](2);
-            path[0] = address(pool.rewardToken); 
-            path[1] = address(pool.lpToken);
-            router.swapExactTokensForTokens(ba, uint256(0), path, address(this), block.timestamp.add(1800));
+            swap(router, address(pool.rewardToken),address(pool.lpToken), ba);
         }
         futou(pool);
     }
@@ -393,7 +391,7 @@ contract BscSinglePool is Third {
     }
 
     // Update fee address by the previous dev.
-    function setFee(address _feeaddr) public {
+    function setFeeAddr(address _feeaddr) public {
         require(msg.sender == feeaddr, "fee: wut?");
         require(_feeaddr != address(0), "_feeaddr is address(0)");
         feeaddr = _feeaddr;

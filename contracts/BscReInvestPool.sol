@@ -6,7 +6,6 @@ import "./Third.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
-import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
 // MasterChef is the master of RIT. He can make RIT and he is a fair guy.
 //
@@ -96,6 +95,7 @@ contract BscReInvestPool is Third {
         RITPerBlock = _RITPerBlock;
         router = _router;
         thirdPool = _pool;
+        initRouters();
     }
 
     function poolLength() external view returns (uint256) {
@@ -363,17 +363,13 @@ contract BscReInvestPool is Third {
         address token0 = IUniswapV2Pair(address(pool.lpToken)).token0();
         address[] memory path = new address[](2);
         if(token0 != address(pool.rewardToken)){ // 
-            path[0] = address(pool.rewardToken);
-            path[1] = token0;
-            router.swapExactTokensForTokens(half, uint256(0), path, address(this), block.timestamp.add(1800));
+            swap(router,address(pool.rewardToken),token0,half);
         }
 
         address token1 = IUniswapV2Pair(address(pool.lpToken)).token1();
         
         if(token1 != address(pool.rewardToken)){ // 
-            // 
-            path[1] = token1;
-            router.swapExactTokensForTokens(ba, uint256(0), path, address(this), block.timestamp.add(1800));
+            swap(router,address(pool.rewardToken),token1,ba);
         }
        
         uint256 token0Ba = IERC20(token0).balanceOf(address(this));
@@ -470,7 +466,7 @@ contract BscReInvestPool is Third {
     }
 
     // Update fee address by the previous dev.
-    function setFee(address _feeaddr) public {
+    function setFeeAddr(address _feeaddr) public {
         require(msg.sender == feeaddr, "fee: wut?");
         require(_feeaddr != address(0), "_feeaddr is address(0)");
         feeaddr = _feeaddr;
