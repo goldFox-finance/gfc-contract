@@ -19,8 +19,6 @@ contract HecoSinglePool is Third {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     IUniswapV2Router02 public router;
-    address public lhb = 0x6537d6307ca40231939985BCF7D83096Dd1B4C09; // lendhub 收取收益的合约地址
-    address public wht = 0x5545153CCFcA01fbd7Dd11C0b23ba694D9509A6F;
     // Info of each uRIT.
     struct URITInfo {
         uint256 amount;     // How many LP tokens the uRIT has provided.
@@ -343,7 +341,7 @@ contract HecoSinglePool is Third {
         PoolInfo storage pool = poolInfo[_pid];
         address[] memory cTokens = new address[](1);
         cTokens[0] = address(pool.thirdPool);
-        ILHB(lhb).claimComp(address(this), cTokens); // 提出利息
+        ILHB(0x6537d6307ca40231939985BCF7D83096Dd1B4C09).claimComp(address(this), cTokens); // 提出利息
         // 
         pool.thirdPool.redeem(0);
         uint256 ba = pool.rewardToken.balanceOf(address(this));
@@ -353,19 +351,7 @@ contract HecoSinglePool is Third {
             uint256 profitFee = ba.mul(fee).div(feeBase);
             pool.rewardToken.safeTransfer(feeaddr,profitFee);
             ba = ba.sub(profitFee);
-            // 剩余换成本币当利息 LHB 
-            if(wht == address(pool.lpToken)){
-                address[] memory path = new address[](2);
-                path[0] = address(pool.rewardToken); 
-                path[1] = address(pool.lpToken);
-                router.swapExactTokensForTokens(ba, uint256(0), path, address(this), block.timestamp.add(1800));
-            } else{
-                address[] memory path = new address[](3);
-                path[0] = address(pool.rewardToken);
-                path[1] = address(wht); // 中间通过WHT路由
-                path[2] = address(pool.lpToken);
-                router.swapExactTokensForTokens(ba, uint256(0), path, address(this), block.timestamp.add(1800));
-            }
+            swap(router, address(pool.rewardToken), address(pool.lpToken), ba);
         }
         futou(pool);
     }
@@ -407,7 +393,7 @@ contract HecoSinglePool is Third {
     }
 
     // Update fee address by the previous dev.
-    function setFee(address _feeaddr) public {
+    function setFeeAddr(address _feeaddr) public {
         require(msg.sender == feeaddr, "fee: wut?");
         require(_feeaddr != address(0), "_feeaddr is address(0)");
         feeaddr = _feeaddr;

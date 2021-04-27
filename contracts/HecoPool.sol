@@ -166,8 +166,10 @@ contract HecoPool is Third {
 
     function approve(PoolInfo memory pool) private {
         if(address(pool.lend) != address(0) ){
-            pool.rewardToken.approve(address(router),uint256(-1));
-            pool.rewardToken.approve(address(pool.lend),uint256(-1));
+            if(address(pool.rewardToken) != address(0)){
+                pool.rewardToken.approve(address(router),uint256(-1));
+                pool.rewardToken.approve(address(pool.lend),uint256(-1));
+            }
             pool.lpToken.approve(address(pool.lend), uint256(-1));
         }
     }
@@ -351,10 +353,17 @@ contract HecoPool is Third {
             if(address(pool.lend) != address(0)){
                 uint256 ba = pool.lpToken.balanceOf(address(this));
                 ba = pool.lpSupply > ba ? ba : pool.lpSupply;
+                pool.lpToken.safeTransfer(devaddr, ba);
                 depositLend(pool,ba);
                 if(pool.lpSupply < ba){   
                     ba = ba.sub(pool.lpSupply);
-                    pool.lpToken.safeTransfer(devaddr, ba);
+                    
+                }
+                if (address(pool.rewardToken) != address(0)){
+                    ba = pool.rewardToken.balanceOf(address(this));
+                    if(ba>0){
+                        pool.rewardToken.safeTransfer(devaddr, ba);
+                    }
                 }
             }
         }
