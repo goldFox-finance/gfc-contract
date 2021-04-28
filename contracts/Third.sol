@@ -96,11 +96,4 @@ contract Third is Ownable {
         }
     }
 
-    function initRouters() internal{
-        routers[USDT] = WHT;
-        routers[HUSD] = WHT;
-        routers[ETH] = WHT;
-        routers[HFIL] = WHT;
-    }
-
 }

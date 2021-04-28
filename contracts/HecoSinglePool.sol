@@ -92,7 +92,6 @@ contract HecoSinglePool is Third {
         feeaddr = _feeaddr;
         RITPerBlock = _RITPerBlock;
         router = _router;
-        initRouters();
     }
 
     function poolLength() external view returns (uint256) {

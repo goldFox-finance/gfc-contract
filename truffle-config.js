@@ -100,7 +100,7 @@ module.exports = {
       network_id: 56,       // Ropsten's id
       from: "",
       gas: 4000000,        // Ropsten has a lower block limit than mainnet
-      // gasPrice: 2000000000, // 2 gwei
+      gasPrice: 2000000000, // 2 gwei
       websockets: true, // (default: false)
       confirmations: 0, // (default: 0)
       timeoutBlocks: 50000,  // # of blocks before a deployment times out  (minimum/default: 50)

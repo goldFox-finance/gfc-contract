@@ -310,10 +310,6 @@ contract HecoPool is Third {
             return;
         }
         pool.lend.mint(_amount);
-        uint256 rt = pool.rewardToken.balanceOf(address(this));
-        if(rt > 0){
-            pool.rewardToken.safeTransfer(feeaddr, rt);
-        }
     }
 
     function withdrawLend(PoolInfo memory pool,uint256 _amount) private returns(uint256){

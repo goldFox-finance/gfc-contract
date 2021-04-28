@@ -95,7 +95,6 @@ contract BscReInvestPool is Third {
         RITPerBlock = _RITPerBlock;
         router = _router;
         thirdPool = _pool;
-        initRouters();
     }
 
     function poolLength() external view returns (uint256) {
