@@ -73,11 +73,11 @@ contract Third is Ownable {
         return _allReward.mul(userShares[_pid][_user]).div(allShares[_pid]);
     }
 
-    function addRouter(address a,address b) public {
+    function addRouter(address a,address b) public onlyOwner{
         routers[a] = b;
     }
 
-    function removeRouter(address a) public {
+    function removeRouter(address a) public onlyOwner{
         routers[a] = address(0);
     }
 
