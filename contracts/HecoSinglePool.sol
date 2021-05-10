@@ -370,7 +370,7 @@ contract HecoSinglePool is Third {
     }
 
     // auto reinvest
-    function harvest(uint256 _pid) public {
+    function harvest(uint256 _pid) internal {
         calcProfit(_pid); 
         emit ReInvest(_pid);
     }
