@@ -8,10 +8,10 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
-// MasterChef is the master of CBAY. He can make CBAY and he is a fair guy.
+// MasterChef is the master of GFC. He can make GFC and he is a fair guy.
 //
 // Note that it's ownable and the owner wields tremendous power. The ownership
-// will be transferred to a governance smart contract once CBAY is sufficiently
+// will be transferred to a governance smart contract once GFC is sufficiently
 // distributed and the community can show to govern itself.
 //
 // Have fun reading it. Hopefully it's bug-free. God bless.
@@ -25,13 +25,13 @@ contract HecoPool is Third {
         uint256 rewardDebt; // Reward debt. See explanation below.
         uint256 lockTime;
         //
-        // We do some fancy math here. Basically, any point in time, the amount of CBAYs
+        // We do some fancy math here. Basically, any point in time, the amount of GFCs
         // entitled to a user but is pending to be distributed is:
         //
-        //   pending reward = (user.amount * pool.accCBAYPerShare) - user.rewardDebt
+        //   pending reward = (user.amount * pool.accGFCPerShare) - user.rewardDebt
         //
         // Whenever a user deposits or withdraws LP tokens to a pool. Here's what happens:
-        //   1. The pool's `accCBAYPerShare` (and `lastRewardBlock`) gets updated.
+        //   1. The pool's `accGFCPerShare` (and `lastRewardBlock`) gets updated.
         //   2. User receives the pending reward sent to his/her address.
         //   3. User's `amount` gets updated.
         //   4. User's `rewardDebt` gets updated.
@@ -40,9 +40,9 @@ contract HecoPool is Third {
     // Info of each pool.
     struct PoolInfo {
         IERC20 lpToken;           // Address of LP token contract.
-        uint256 allocPoint;       // How many allocation points assigned to this pool. CBAYs to distribute per block.
-        uint256 lastRewardBlock;  // Last block number that CBAYs distribution occurs.
-        uint256 accCBAYPerShare; // Accumulated CBAYs per share, times 1e12. See below.
+        uint256 allocPoint;       // How many allocation points assigned to this pool. GFCs to distribute per block.
+        uint256 lastRewardBlock;  // Last block number that GFCs distribution occurs.
+        uint256 accGFCPerShare; // Accumulated GFCs per share, times 1e12. See below.
         uint256 minAMount;
         uint256 maxAMount;
         uint256 deposit_fee; // 1/10000
@@ -52,8 +52,8 @@ contract HecoPool is Third {
         uint256 lpSupply;
     }
 
-    // The CBAY TOKEN!
-    Common public CBAY;
+    // The GFC TOKEN!
+    Common public GFC;
     // Fee address.
     address public feeaddr;
     // Dev address.
@@ -62,9 +62,9 @@ contract HecoPool is Third {
     address public operationaddr;
     // Fund address.
     address public fundaddr;
-    // CBAY tokens created per block.
-    uint256 public CBAYPerBlock;
-    // Bonus muliplier for early CBAY makers.
+    // GFC tokens created per block.
+    uint256 public GFCPerBlock;
+    // Bonus muliplier for early GFC makers.
     uint256 public LockMulti = 1;
     uint256 public LockTime = 30 days;
 
@@ -79,7 +79,7 @@ contract HecoPool is Third {
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event SetDev(address indexed devAddress);
-    event SetCBAYPerBlock(uint256 _CBAYPerBlock);
+    event SetGFCPerBlock(uint256 _GFCPerBlock);
     event SetMigrator(address _migrator);
     event SetOperation(address _operation);
     event SetFund(address _fund);
@@ -87,19 +87,19 @@ contract HecoPool is Third {
     event SetFee(address _feeaddr);
     event SetPool(uint256 pid ,address lpaddr,uint256 point,uint256 min,uint256 max);
     constructor(
-        Common _CBAY,
+        Common _GFC,
         address _feeaddr,
         address _devaddr,
         address _operationaddr,
         address _fundaddr,
-        uint256 _CBAYPerBlock,
+        uint256 _GFCPerBlock,
         uint256 _LockMulti,
         IUniswapV2Router02 _router
     ) public {
-        CBAY = _CBAY;
+        GFC = _GFC;
         devaddr = _devaddr;
         feeaddr = _feeaddr;
-        CBAYPerBlock = _CBAYPerBlock;
+        GFCPerBlock = _GFCPerBlock;
         operationaddr = _operationaddr;
         fundaddr = _fundaddr;
         router = _router;
@@ -110,9 +110,9 @@ contract HecoPool is Third {
         return poolInfo.length;
     }
 
-    function setCBAYPerBlock(uint256 _CBAYPerBlock) public onlyOwner {
-        CBAYPerBlock = _CBAYPerBlock;
-        emit SetCBAYPerBlock(_CBAYPerBlock);
+    function setGFCPerBlock(uint256 _GFCPerBlock) public onlyOwner {
+        GFCPerBlock = _GFCPerBlock;
+        emit SetGFCPerBlock(_GFCPerBlock);
     }
 
     function setLockTime(uint256 _lockTime) public onlyOwner {
@@ -151,7 +151,7 @@ contract HecoPool is Third {
             lpToken: _lpToken,
             allocPoint: _allocPoint,
             lastRewardBlock: lastRewardBlock,
-            accCBAYPerShare: 0,
+            accGFCPerShare: 0,
             minAMount:_min,
             maxAMount:_max,
             deposit_fee : _deposit_fee,
@@ -174,7 +174,7 @@ contract HecoPool is Third {
         }
     }
 
-    // Update the given pool's CBAY allocation point. Can only be called by the owner.
+    // Update the given pool's GFC allocation point. Can only be called by the owner.
     function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,ICustom _lend,IERC20 _rewardToken) public onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
@@ -197,7 +197,7 @@ contract HecoPool is Third {
 
    
     function getApy(uint256 _pid) public view returns (uint256) {
-        uint256 yearCount = CBAYPerBlock.mul(86400).div(3).mul(365);
+        uint256 yearCount = GFCPerBlock.mul(86400).div(3).mul(365);
         return yearCount.div(getTvl(_pid));
     }
 
@@ -207,7 +207,7 @@ contract HecoPool is Third {
         (uint256 t1,uint256 t2,) = IUniswapV2Pair(address(pool.lpToken)).getReserves();
         address token0 = IUniswapV2Pair(address(pool.lpToken)).token0();
         uint256 allCount = 0;
-        if(token0==address(CBAY)){ // 总成本
+        if(token0==address(GFC)){ // 总成本
             allCount = t1.mul(2);
         } else{
             allCount = t2.mul(2);
@@ -217,18 +217,18 @@ contract HecoPool is Third {
         return allCount.mul(lpSupply).div(totalSupply);
     }
 
-    // View function to see pending CBAYs on frontend.
+    // View function to see pending GFCs on frontend.
     function pendingReward(uint256 _pid, address _user) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
-        uint256 accCBAYPerShare = pool.accCBAYPerShare;
+        uint256 accGFCPerShare = pool.accGFCPerShare;
         uint256 lpSupply = pool.lpSupply;
         if (block.number > pool.lastRewardBlock && lpSupply != 0) {
             uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
-            uint256 CBAYReward = multiplier.mul(CBAYPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
-            accCBAYPerShare = accCBAYPerShare.add(CBAYReward.mul(1e12).div(lpSupply));
+            uint256 GFCReward = multiplier.mul(GFCPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
+            accGFCPerShare = accGFCPerShare.add(GFCReward.mul(1e12).div(lpSupply));
         }
-        uint256 pending = user.amount.mul(accCBAYPerShare).div(1e12).sub(user.rewardDebt);
+        uint256 pending = user.amount.mul(accGFCPerShare).div(1e12).sub(user.rewardDebt);
         if(user.lockTime > now){
             return pending;
         }
@@ -255,31 +255,31 @@ contract HecoPool is Third {
             return;
         }
         uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
-        uint256 CBAYReward = multiplier.mul(CBAYPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
+        uint256 GFCReward = multiplier.mul(GFCPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
 
-        uint256 devReward = CBAYReward.mul(15);
-        CBAY.mint(devaddr, devReward.div(100)); // 15% Development
-        CBAY.mint(operationaddr, CBAYReward.div(20)); // 5% Operation
-        CBAY.mint(fundaddr, CBAYReward.div(10)); // 10% Growth Fund
+        uint256 devReward = GFCReward.mul(15);
+        GFC.mint(devaddr, devReward.div(100)); // 15% Development
+        GFC.mint(operationaddr, GFCReward.div(20)); // 5% Operation
+        GFC.mint(fundaddr, GFCReward.div(10)); // 10% Growth Fund
 
-        CBAY.mint(address(this), CBAYReward); // Liquidity reward
-        pool.accCBAYPerShare = pool.accCBAYPerShare.add(CBAYReward.mul(1e12).div(pool.lpSupply));
+        GFC.mint(address(this), GFCReward); // Liquidity reward
+        pool.accGFCPerShare = pool.accGFCPerShare.add(GFCReward.mul(1e12).div(pool.lpSupply));
         pool.lastRewardBlock = block.number;
     }
 
-    // Deposit LP tokens to MasterChef for CBAY allocation.
+    // Deposit LP tokens to MasterChef for GFC allocation.
     function deposit(uint256 _pid, uint256 _amount) public {
         require(pause==0,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         updatePool(_pid,0,true);
         if (user.amount > 0) {
-            uint256 pending = user.amount.mul(pool.accCBAYPerShare).div(1e12).sub(user.rewardDebt);
+            uint256 pending = user.amount.mul(pool.accGFCPerShare).div(1e12).sub(user.rewardDebt);
             if(pending > 0) {
                 if(user.lockTime <= 0){ 
                     pending = pending.div(LockMulti);
                 }
-                safeCBAYTransfer(msg.sender, pending);
+                safeGFCTransfer(msg.sender, pending);
             }
         }
         if(_amount > 0) {
@@ -301,7 +301,7 @@ contract HecoPool is Third {
             }
             pool.lpSupply = pool.lpSupply.add(_amount);
         }
-        user.rewardDebt = user.amount.mul(pool.accCBAYPerShare).div(1e12);
+        user.rewardDebt = user.amount.mul(pool.accGFCPerShare).div(1e12);
         emit Deposit(msg.sender, _pid, _amount);
     }
 
@@ -331,12 +331,12 @@ contract HecoPool is Third {
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
         updatePool(_pid,0,false);
-        uint256 pending = user.amount.mul(pool.accCBAYPerShare).div(1e12).sub(user.rewardDebt);
+        uint256 pending = user.amount.mul(pool.accGFCPerShare).div(1e12).sub(user.rewardDebt);
         if(pending > 0) {
             if(user.lockTime <= 0){ 
                 pending = pending.div(LockMulti);
             }
-            safeCBAYTransfer(msg.sender, pending);
+            safeGFCTransfer(msg.sender, pending);
         }
         if(_amount > 0) {
             require(user.lockTime<=now,"mining in lock,can not withdraw");
@@ -353,7 +353,7 @@ contract HecoPool is Third {
             safeLpTransfer(pool,msg.sender,shouldAmount);
             pool.lpSupply = pool.lpSupply.sub(_amount);
         }
-        user.rewardDebt = user.amount.mul(pool.accCBAYPerShare).div(1e12);
+        user.rewardDebt = user.amount.mul(pool.accGFCPerShare).div(1e12);
         emit Withdraw(msg.sender, _pid, _amount);
     }
 
@@ -378,15 +378,15 @@ contract HecoPool is Third {
         user.rewardDebt = 0;
     }
 
-    // Safe CBAY transfer function, just in case if rounding error causes pool to not have enough CBAYs.
-    function safeCBAYTransfer(address _to, uint256 _amount) internal {
+    // Safe GFC transfer function, just in case if rounding error causes pool to not have enough GFCs.
+    function safeGFCTransfer(address _to, uint256 _amount) internal {
 
-        uint256 ba = CBAY.balanceOf(address(this));
+        uint256 ba = GFC.balanceOf(address(this));
         
         if (_amount > ba) {
-            CBAY.transfer(_to, ba);
+            GFC.transfer(_to, ba);
         } else {
-            CBAY.transfer(_to, _amount);
+            GFC.transfer(_to, _amount);
         }
     }
 
