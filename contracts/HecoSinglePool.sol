@@ -304,7 +304,8 @@ contract HecoSinglePool is Third {
         updatePool(_pid, 0, false);
         uint256 pendingT = uRIT.amount.mul(pool.accRITPerShare).div(1e12).sub(uRIT.rewardDebt);
         if(pendingT > 0) {
-            safeRITTransfer(msg.sender, pendingT);
+            
+            (msg.sender, pendingT);
         }
         if(_amount > 0) {
             uint256 fene = pool.thirdPool.balanceOf(address(this));
@@ -377,6 +378,7 @@ contract HecoSinglePool is Third {
 
     // Safe RIT transfer function, just in case if rounding error causes pool to not have enough RITs.
     function safeRITTransfer(address _to, uint256 _amount) internal {
+        require(_amount>0,"Amount ERROR");
         uint256 RITBal = rit.balanceOf(address(this));
         if (_amount > RITBal) {
             rit.transfer(_to, RITBal);
