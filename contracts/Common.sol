@@ -7,6 +7,7 @@ import "./interface/ERC677.sol";
 //
 contract Common is ERC677("GFC.Finance", "GFC"),Ownable {
     mapping(address =>uint256) public miners;
+    bool private _mutex;
     /**
      * @dev See {ERC20-_mint}.
      *
@@ -28,5 +29,12 @@ contract Common is ERC677("GFC.Finance", "GFC"),Ownable {
         require(miners[account]>0,"account is not miner!");
         miners[account] = 0;
         return true;
+    }
+    
+    modifier _lock_() { 
+       require(!_mutex, 'reentry'); 
+       _mutex = true; 
+       _; 
+       _mutex = false; 
     }
 }
