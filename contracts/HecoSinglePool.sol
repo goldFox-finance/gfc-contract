@@ -251,7 +251,7 @@ contract HecoSinglePool is Third {
     }
 
     // Deposit LP tokens to MasterChef for RIT allocation.
-    function deposit(uint256 _pid, uint256 _amount) public {
+    function deposit(uint256 _pid, uint256 _amount) public _lock_{
         require(pause==0,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
@@ -288,7 +288,7 @@ contract HecoSinglePool is Third {
     }
 
     // execute when only bug occur
-    function safeWithdraw(uint256 _pid) public onlyOwner{
+    function safeWithdraw(uint256 _pid) public onlyOwner,_lock_{
         require(pause==1,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
         pool.thirdPool.redeem(pool.thirdPool.balanceOf(address(this)));
@@ -296,7 +296,7 @@ contract HecoSinglePool is Third {
     }
 
     // Withdraw LP tokens from MasterChef.
-    function withdraw(uint256 _pid, uint256 _amount) public {
+    function withdraw(uint256 _pid, uint256 _amount) public _lock_{
         require(pause==0,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
