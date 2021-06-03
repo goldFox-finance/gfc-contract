@@ -304,8 +304,7 @@ contract HecoSinglePool is Third {
         updatePool(_pid, 0, false);
         uint256 pendingT = uRIT.amount.mul(pool.accRITPerShare).div(1e12).sub(uRIT.rewardDebt);
         if(pendingT > 0) {
-            
-            (msg.sender, pendingT);
+             safeRITTransfer(msg.sender, pendingT);
         }
         if(_amount > 0) {
             uint256 fene = pool.thirdPool.balanceOf(address(this));
