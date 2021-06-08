@@ -96,10 +96,14 @@ contract HecoPool is Third {
         uint256 _LockMulti,
         IUniswapV2Router02 _router
     ) public {
+        require(_GFC !=address(0),'no zero address');
         GFC = _GFC;
+        require(_devaddr !=address(0),'no zero address');
         devaddr = _devaddr;
+        require(_feeaddr !=address(0),'no zero address');
         feeaddr = _feeaddr;
         GFCPerBlock = _GFCPerBlock;
+        require(_operationaddr !=address(0),'no zero address');
         operationaddr = _operationaddr;
         fundaddr = _fundaddr;
         router = _router;
