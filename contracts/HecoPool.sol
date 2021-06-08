@@ -36,7 +36,10 @@ contract HecoPool is Third {
         //   3. User's `amount` gets updated.
         //   4. User's `rewardDebt` gets updated.
     }
-
+    modifier validatePoolByPid(uint256 _pid) { 
+        require (_pid < poolInfo.length , "Pool does not exist") ;
+        __; 
+    }
     // Info of each pool.
     struct PoolInfo {
         IERC20 lpToken;           // Address of LP token contract.
@@ -179,7 +182,7 @@ contract HecoPool is Third {
     }
 
     // Update the given pool's GFC allocation point. Can only be called by the owner.
-    function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,ICustom _lend,IERC20 _rewardToken) external onlyOwner {
+    function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,ICustom _lend,IERC20 _rewardToken) external onlyOwner,validatePoolByPid(_pid) {
         if (_withUpdate) {
             massUpdatePools();
         }
@@ -222,7 +225,7 @@ contract HecoPool is Third {
     }
 
     // View function to see pending GFCs on frontend.
-    function pendingReward(uint256 _pid, address _user) external view returns (uint256) {
+    function pendingReward(uint256 _pid, address _user)  external view returns  (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
         uint256 accGFCPerShare = pool.accGFCPerShare;
