@@ -110,16 +110,16 @@ contract HecoPool is Third {
         return poolInfo.length;
     }
 
-    function setGFCPerBlock(uint256 _GFCPerBlock) public onlyOwner {
+    function setGFCPerBlock(uint256 _GFCPerBlock) external onlyOwner {
         GFCPerBlock = _GFCPerBlock;
         emit SetGFCPerBlock(_GFCPerBlock);
     }
 
-    function setLockTime(uint256 _lockTime) public onlyOwner {
+    function setLockTime(uint256 _lockTime) external onlyOwner {
         LockTime = _lockTime;
     }
 
-    function setLockMulti(uint256 _lockMulti) public onlyOwner {
+    function setLockMulti(uint256 _lockMulti) external onlyOwner {
         LockMulti = _lockMulti;
     }
 
@@ -132,7 +132,7 @@ contract HecoPool is Third {
     }
 
     // 设置锁仓时间 30天一周期
-    function SetUserLock(uint256 id) public {
+    function SetUserLock(uint256 id) external {
         UserInfo storage user = userInfo[id][msg.sender];
         require(user.amount>0,"need deposit first");
         require(user.lockTime<=0,"has lock already");
@@ -141,7 +141,7 @@ contract HecoPool is Third {
 
     // Add a new lp to the pool. Can only be called by the owner.
     // XXX DO NOT add the same LP token more than once. Rewards will be messed up if you do.
-    function add(uint256 _allocPoint, IERC20 _lpToken, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,ICustom _lend,IERC20 _rewardToken) public onlyOwner {
+    function add(uint256 _allocPoint, IERC20 _lpToken, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,ICustom _lend,IERC20 _rewardToken) external onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
         }
@@ -175,7 +175,7 @@ contract HecoPool is Third {
     }
 
     // Update the given pool's GFC allocation point. Can only be called by the owner.
-    function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,ICustom _lend,IERC20 _rewardToken) public onlyOwner {
+    function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,ICustom _lend,IERC20 _rewardToken) external onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
         }
@@ -196,7 +196,7 @@ contract HecoPool is Third {
     }
 
    
-    function getApy(uint256 _pid) public view returns (uint256) {
+    function getApy(uint256 _pid) external view returns (uint256) {
         uint256 yearCount = GFCPerBlock.mul(86400).div(3).mul(365);
         return yearCount.div(getTvl(_pid));
     }
@@ -369,7 +369,7 @@ contract HecoPool is Third {
     }
 
     // Withdraw without caring about rewards. EMERGENCY ONLY.
-    function emergencyWithdraw(uint256 _pid) public _lock_ {
+    function emergencyWithdraw(uint256 _pid) external _lock_ {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         pool.lpToken.safeTransfer(address(msg.sender), user.amount);
@@ -391,7 +391,7 @@ contract HecoPool is Third {
     }
 
     // Update dev address by the previous dev.
-    function dev(address _devaddr) public {
+    function dev(address _devaddr) external {
         require(msg.sender == devaddr, "dev: wut?");
         require(_devaddr != address(0), "_devaddr is address(0)");
         devaddr = _devaddr;
@@ -399,7 +399,7 @@ contract HecoPool is Third {
     }
 
     // Update operation address by the previous operation.
-    function operation(address _opaddr) public {
+    function operation(address _opaddr) external {
         require(msg.sender == operationaddr, "operation: wut?");
         require(_opaddr != address(0), "_opaddr is address(0)");
         operationaddr = _opaddr;
@@ -407,7 +407,7 @@ contract HecoPool is Third {
     }
 
     // Update fund address by the previous fund.
-    function fund(address _fundaddr) public {
+    function fund(address _fundaddr) external {
         require(msg.sender == fundaddr, "fund: wut?");
         require(_fundaddr != address(0), "_fundaddr is address(0)");
         fundaddr = _fundaddr;
@@ -415,7 +415,7 @@ contract HecoPool is Third {
     }
 
     // Update fee address by the previous institution.
-    function setFee(address _feeaddr) public {
+    function setFee(address _feeaddr) external {
         require(msg.sender == feeaddr, "feeaddr: wut?");
         require(_feeaddr != address(0), "_feeaddr is address(0)");
         feeaddr = _feeaddr;
