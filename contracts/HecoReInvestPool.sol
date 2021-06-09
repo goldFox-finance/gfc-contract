@@ -214,17 +214,16 @@ contract BscReInvestPool is Third {
     function massUpdatePools() public {
         uint256 length = poolInfo.length;
         for (uint256 pid = 0; pid < length; ++pid) {
-            updatePool(pid,0,true);
+            updatePool(pid);
         }
     }
 
     // Update reward variables of the given pool to be up-to-date.
-    function updatePool(uint256 _pid,uint256 _amount,bool isAdd) public {
+    function updatePool(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
         if (block.number <= pool.lastRewardBlock) {
             return;
         }
-        pool.lpSupply = isAdd ? pool.lpSupply.add(_amount) : pool.lpSupply.sub(_amount);
         if (pool.lpSupply == 0) {
             pool.lastRewardBlock = block.number;
             return;
@@ -242,7 +241,7 @@ contract BscReInvestPool is Third {
         require(pause==0,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
-        updatePool(_pid, 0, true);
+        updatePool(_pid);
         harvest(_pid);// 剩余利息进行复投
         uint256 pendingT = uRIT.amount.mul(pool.accRITPerShare).div(1e12).sub(uRIT.rewardDebt);
         if(pendingT > 0) {
@@ -294,7 +293,7 @@ contract BscReInvestPool is Third {
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
         require(uRIT.amount >= _amount, "withdraw: not good");
-        updatePool(_pid, 0, false);
+        updatePool(_pid);
         
         uint256 pendingT = uRIT.amount.mul(pool.accRITPerShare).div(1e12).sub(uRIT.rewardDebt);
         if(pendingT > 0) {
