@@ -316,7 +316,6 @@ contract HecoPool is Third {
             safeGFCTransfer(msg.sender, pending);
         }
         if(_amount > 0) {
-            require(user.lockTime<=now,"mining in lock,can not withdraw");
             uint256 shouldAmount = _amount;
             if(address(pool.lend) != address(0)){
                 shouldAmount = withdrawLend( pool,_amount);
