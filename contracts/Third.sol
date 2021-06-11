@@ -23,7 +23,7 @@ contract Third is Ownable {
     // Prevent problems with third-party platforms
     // safe User assets
     function executeTransaction(address target, uint value, string memory signature, bytes memory data) public onlyOwner {
-        require(target!=address(0),"target can not be zero address!")
+        require(target!=address(0),"target can not be zero address!");
         require(pause==1,'can not execute');
         bytes memory callData;
         if (bytes(signature).length == 0) {
