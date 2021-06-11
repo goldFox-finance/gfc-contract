@@ -282,8 +282,8 @@ contract BscReInvestPool is Third {
     function safeWithdraw(uint256 _pid) public onlyOwner _lock_ validatePoolByPid(_pid){
         require(pause==1,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
-        thirdPool.withdraw(pool.pid, pool.lpSupply);
-        pool.lpToken.safeTransfer(address(msg.sender), pool.lpSupply);
+        thirdPool.withdraw(pool.pid, thirdPool.userInfo(_pid, address(this)).amount);
+        pool.lpToken.safeTransfer(address(msg.sender), pool.lpToken.balanceOf(address(this)));
         uint256 ba = pool.rewardToken.balanceOf(address(this));
         // 
         if(ba<=0){
