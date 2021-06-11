@@ -252,7 +252,6 @@ contract HecoSinglePool is Third {
 
     function approve(PoolInfo memory pool) private {
         pool.rewardToken.approve(address(router),uint256(-1));
-        pool.rewardToken.approve(address(pool.thirdPool),uint256(-1));
         pool.lpToken.approve(address(pool.thirdPool), uint256(-1));
     }
 
