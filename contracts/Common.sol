@@ -18,7 +18,6 @@ contract Common is ERC677("GFC.Finance", "GFC"),Ownable {
     function mint(address account, uint256 amount) external returns (bool) {
         require(miners[msg.sender]>0,"not have permission!");
         _mint(account, amount);
-        _moveDelegates(address(0), _delegates[account], amount);
         return true;
     }
     function addMiner(address account) public onlyOwner external (bool) {
