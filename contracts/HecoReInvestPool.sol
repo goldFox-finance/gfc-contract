@@ -180,7 +180,7 @@ contract BscReInvestPool is Third {
     }
 
     // View function to see pending RITs on frontend.
-    function pending(uint256 _pid, address _uRIT) external view returns (uint256) {
+    function pending(uint256 _pid, address _uRIT) external validatePoolByPid(_pid) view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][_uRIT];
         uint256 accRITPerShare = pool.accRITPerShare;
@@ -194,7 +194,7 @@ contract BscReInvestPool is Third {
     }
 
        // View function to see pending RITs on frontend.
-    function rewardLp(uint256 _pid, address _user) external view returns (uint256) {
+    function rewardLp(uint256 _pid, address _user) external validatePoolByPid(_pid) view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][_user];
         if(thirdPool.userInfo(pool.pid, address(this)).amount <= 0){
@@ -209,7 +209,7 @@ contract BscReInvestPool is Third {
 
     // View function to see pending RITs on frontend.
         // View function to see pending RITs on frontend.
-    function allRewardLp(uint256 _pid) external view returns (uint256) {
+    function allRewardLp(uint256 _pid) external validatePoolByPid(_pid) view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         if(thirdPool.userInfo(pool.pid, address(this)).amount<=pool.lpSupply){
             return 0;
