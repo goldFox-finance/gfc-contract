@@ -23,7 +23,6 @@ contract HecoSinglePool is Third {
     struct URITInfo {
         uint256 amount;     // How many LP tokens the uRIT has provided.
         uint256 rewardDebt; // Reward debt. See explanation below.
-        uint256 rewardLpDebt; // 已经分的lp利息.
         //
         // We do some fancy math here. Basically, any point in time, the amount of RITs
         // entitled to a uRIT but is pending to be distributed is:
