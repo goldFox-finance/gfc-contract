@@ -178,7 +178,7 @@ contract HecoSinglePool is Third {
     }
 
     // View function to see pending RITs on frontend.
-    function pending(uint256 _pid, address _uRIT) external view returns (uint256) {
+    function pending(uint256 _pid, address _uRIT) external validatePoolByPid(_pid) view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][_uRIT];
         uint256 accRITPerShare = pool.accRITPerShare;
@@ -200,7 +200,7 @@ contract HecoSinglePool is Third {
     }
 
     // View function to see pending RITs on frontend.
-    function rewardLp(uint256 _pid, address _user) external view returns (uint256) {
+    function rewardLp(uint256 _pid, address _user) external validatePoolByPid(_pid) view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][_user];
         uint256 thirdAllBalance = balanceOfUnderlying(pool);
@@ -215,7 +215,7 @@ contract HecoSinglePool is Third {
     }
 
     // View function to see pending RITs on frontend.
-    function allRewardLp(uint256 _pid) external view returns (uint256) {
+    function allRewardLp(uint256 _pid) external view validatePoolByPid(_pid) returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         uint256 thirdAllBalance = balanceOfUnderlying(pool);
         if(thirdAllBalance <= pool.lpSupply){
