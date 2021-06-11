@@ -189,7 +189,7 @@ contract HecoPool is Third {
     }
 
 
-    function getTvl(uint256 _pid) public view returns (uint256) {
+    function getTvl(uint256 _pid) public validatePoolByPid(_pid) view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         (uint256 t1,uint256 t2,) = IUniswapV2Pair(address(pool.lpToken)).getReserves();
         address token0 = IUniswapV2Pair(address(pool.lpToken)).token0();
@@ -205,7 +205,7 @@ contract HecoPool is Third {
     }
 
     // View function to see pending GFCs on frontend.
-    function pendingReward(uint256 _pid, address _user)  external view returns  (uint256) {
+    function pendingReward(uint256 _pid, address _user)  external validatePoolByPid(_pid) view returns  (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
         uint256 accGFCPerShare = pool.accGFCPerShare;
@@ -227,7 +227,7 @@ contract HecoPool is Third {
     }
 
     // Update reward variables of the given pool to be up-to-date.
-    function updatePool(uint256 _pid) public {
+    function updatePool(uint256 _pid) public validatePoolByPid(_pid){
         PoolInfo storage pool = poolInfo[_pid];
         if (block.number <= pool.lastRewardBlock) {
             return;
