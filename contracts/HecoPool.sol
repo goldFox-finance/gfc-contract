@@ -183,7 +183,7 @@ contract HecoPool is Third {
     }
 
    
-    function getApy(uint256 _pid) external view returns (uint256) {
+    function getApy(uint256 _pid) external validatePoolByPid(_pid) view returns (uint256) {
         uint256 yearCount = GFCPerBlock.mul(86400).div(3).mul(365);
         return yearCount.div(getTvl(_pid));
     }
