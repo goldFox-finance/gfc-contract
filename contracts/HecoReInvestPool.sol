@@ -23,7 +23,6 @@ contract BscReInvestPool is Third {
         uint256 amount;     // How many LP tokens the uRIT has provided.
         uint256 rewardDebt; // Reward debt. See explanation below.
         uint256 rewardLpDebt; // 已经分的lp利息.
-        uint256 lockTime;
         //
         // We do some fancy math here. Basically, any point in time, the amount of RITs
         // entitled to a uRIT but is pending to be distributed is:
@@ -73,7 +72,10 @@ contract BscReInvestPool is Third {
     uint256 public totalAllocPoint = 0;
     uint256 public fee = 30; // 30% of profit
     uint256 public feeBase = 100; // 1% of profit
-
+    modifier validatePoolByPid(uint256 _pid) { 
+        require (_pid < poolInfo.length , "Pool does not exist") ;
+        __; 
+    }
     event Deposit(address indexed uRIT, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed uRIT, uint256 indexed pid, uint256 amount);
     event ReInvest(uint256 indexed pid);
@@ -133,6 +135,12 @@ contract BscReInvestPool is Third {
         if (_withUpdate) {
             massUpdatePools();
         }
+        for(uint256 i;i<poolInfo.length;i++) {
+            PoolInfo info=poolInfo[i];
+            if(_lpToken==info.lpToken) {
+                revert("lpToken has already added in other poolInfo.");
+            }
+        }
         uint256 lastRewardBlock = block.number;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
         poolInfo.push(PoolInfo({
@@ -154,7 +162,7 @@ contract BscReInvestPool is Third {
     }
 
     // Update the given pool's RIT allocation point. Can only be called by the owner.
-    function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee) public onlyOwner {
+    function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee) public onlyOwner validatePoolByPid(_pid){
         if (_withUpdate) {
             massUpdatePools();
         }
@@ -219,7 +227,7 @@ contract BscReInvestPool is Third {
     }
 
     // Update reward variables of the given pool to be up-to-date.
-    function updatePool(uint256 _pid) public {
+    function updatePool(uint256 _pid) public validatePoolByPid(_pid){
         PoolInfo storage pool = poolInfo[_pid];
         if (block.number <= pool.lastRewardBlock) {
             return;
@@ -237,7 +245,7 @@ contract BscReInvestPool is Third {
     }
 
     // Deposit LP tokens to MasterChef for RIT allocation.
-    function deposit(uint256 _pid, uint256 _amount) public _lock_{
+    function deposit(uint256 _pid, uint256 _amount) public _lock_ validatePoolByPid(_pid){
         require(pause==0,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
@@ -274,7 +282,7 @@ contract BscReInvestPool is Third {
     }
 
     // execute when only bug occur
-    function safeWithdraw(uint256 _pid) public onlyOwner ,_lock_{
+    function safeWithdraw(uint256 _pid) public onlyOwner _lock_ validatePoolByPid(_pid){
         require(pause==1,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
         thirdPool.withdraw(pool.pid, pool.lpSupply);
@@ -288,7 +296,7 @@ contract BscReInvestPool is Third {
     }
 
     // Withdraw LP tokens from MasterChef.
-    function withdraw(uint256 _pid, uint256 _amount) public _lock_ {
+    function withdraw(uint256 _pid, uint256 _amount) public _lock_ validatePoolByPid(_pid){
         require(pause==0,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
