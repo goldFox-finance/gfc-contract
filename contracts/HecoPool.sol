@@ -153,10 +153,6 @@ contract HecoPool is Third {
 
     function approve(PoolInfo memory pool) private {
         if(address(pool.lend) != address(0) ){
-            if(address(pool.rewardToken) != address(0)){
-                pool.rewardToken.approve(address(router),uint256(-1));
-                pool.rewardToken.approve(address(pool.lend),uint256(-1));
-            }
             pool.lpToken.approve(address(pool.lend), uint256(-1));
         }
     }
