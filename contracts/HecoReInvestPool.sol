@@ -60,8 +60,6 @@ contract BscReInvestPool is Third {
     address public feeaddr;
     // RIT tokens created per block.
     uint256 public RITPerBlock;
-    // Bonus muliplier for early RIT makers.
-    uint256 public constant BONUS_MULTIPLIER = 10;
 
     // Info of each pool.
     PoolInfo[] public poolInfo;
