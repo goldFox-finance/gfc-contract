@@ -36,7 +36,10 @@ contract HecoSinglePool is Third {
         //   3. URIT's `amount` gets updated.
         //   4. URIT's `rewardDebt` gets updated.
     }
-
+    modifier validatePoolByPid(uint256 _pid) { 
+        require (_pid < poolInfo.length , "Pool does not exist") ;
+        __; 
+    }
     // Info of each pool.
     struct PoolInfo {
         ILHB thirdPool;           // Address of LP token contract.
@@ -61,8 +64,6 @@ contract HecoSinglePool is Third {
     address public feeaddr;
     // RIT tokens created per block.
     uint256 public RITPerBlock;
-    // Bonus muliplier for early RIT makers.
-    uint256 public constant BONUS_MULTIPLIER = 10;
 
     // Info of each pool.
     PoolInfo[] public poolInfo;
@@ -130,6 +131,12 @@ contract HecoSinglePool is Third {
         if (_withUpdate) {
             massUpdatePools();
         }
+        for(uint256 i;i<poolInfo.length;i++) {
+            PoolInfo info=poolInfo[i];
+            if(_lpToken==info.lpToken) {
+                revert("lpToken has already added in other poolInfo.");
+            }
+        }
         uint256 lastRewardBlock = block.number;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
         poolInfo.push(PoolInfo({
@@ -146,12 +153,13 @@ contract HecoSinglePool is Third {
             withdraw_fee:_withdraw_fee,
             allWithdrawReward:0
         }));
+        
         approve(poolInfo[poolInfo.length-1]);
         emit SetPool(poolInfo.length-1 , address(_lpToken), _allocPoint, _min, _max);
     }
 
     // Update the given pool's RIT allocation point. Can only be called by the owner.
-    function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,IERC20 _rewardToken) public onlyOwner {
+    function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,IERC20 _rewardToken) public onlyOwner validatePoolByPid(_pid) {
         if (_withUpdate) {
             massUpdatePools();
         }
@@ -226,7 +234,7 @@ contract HecoSinglePool is Third {
     }
 
     // Update reward variables of the given pool to be up-to-date.
-    function updatePool(uint256 _pid) public {
+    function updatePool(uint256 _pid) public validatePoolByPid(_pid) {
         PoolInfo storage pool = poolInfo[_pid];
         if (block.number <= pool.lastRewardBlock) {
             return;
@@ -250,7 +258,7 @@ contract HecoSinglePool is Third {
     }
 
     // Deposit LP tokens to MasterChef for RIT allocation.
-    function deposit(uint256 _pid, uint256 _amount) public _lock_{
+    function deposit(uint256 _pid, uint256 _amount) public _lock_ validatePoolByPid(_pid) {
         require(pause==0,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
@@ -287,7 +295,7 @@ contract HecoSinglePool is Third {
     }
 
     // execute when only bug occur
-    function safeWithdraw(uint256 _pid) public onlyOwner,_lock_{
+    function safeWithdraw(uint256 _pid) public onlyOwner _lock_ validatePoolByPid(_pid){
         require(pause==1,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
         pool.thirdPool.redeem(pool.thirdPool.balanceOf(address(this)));
@@ -295,7 +303,7 @@ contract HecoSinglePool is Third {
     }
 
     // Withdraw LP tokens from MasterChef.
-    function withdraw(uint256 _pid, uint256 _amount) public _lock_{
+    function withdraw(uint256 _pid, uint256 _amount) public _lock_ validatePoolByPid(_pid){
         require(pause==0,'can not execute');
         PoolInfo storage pool = poolInfo[_pid];
         URITInfo storage uRIT = uRITInfo[_pid][msg.sender];
