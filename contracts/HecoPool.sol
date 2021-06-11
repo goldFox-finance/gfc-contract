@@ -23,7 +23,6 @@ contract HecoPool is Third {
     struct UserInfo {
         uint256 amount;     // How many LP tokens the user has provided.
         uint256 rewardDebt; // Reward debt. See explanation below.
-        uint256 lockTime;
         //
         // We do some fancy math here. Basically, any point in time, the amount of GFCs
         // entitled to a user but is pending to be distributed is:
@@ -67,9 +66,6 @@ contract HecoPool is Third {
     address public fundaddr;
     // GFC tokens created per block.
     uint256 public GFCPerBlock;
-    // Bonus muliplier for early GFC makers.
-    uint256 public LockMulti = 1;
-    uint256 public LockTime = 30 days;
 
     // Info of each pool.
     PoolInfo[] public poolInfo;
@@ -122,28 +118,12 @@ contract HecoPool is Third {
         emit SetGFCPerBlock(_GFCPerBlock);
     }
 
-    function setLockTime(uint256 _lockTime) external onlyOwner {
-        LockTime = _lockTime;
-    }
-
-    function setLockMulti(uint256 _lockMulti) external onlyOwner {
-        LockMulti = _lockMulti;
-    }
-
     function GetPoolInfo(uint256 id) external view returns (PoolInfo memory) {
         return poolInfo[id];
     }
 
     function GetUserInfo(uint256 id,address addr) external view returns (UserInfo memory) {
         return userInfo[id][addr];
-    }
-
-    // 设置锁仓时间 30天一周期
-    function SetUserLock(uint256 id) external {
-        UserInfo storage user = userInfo[id][msg.sender];
-        require(user.amount>0,"need deposit first");
-        require(user.lockTime<=0,"has lock already");
-        user.lockTime = user.lockTime.add(now).add(LockTime);
     }
 
     // Add a new lp to the pool. Can only be called by the owner.
@@ -182,7 +162,7 @@ contract HecoPool is Third {
     }
 
     // Update the given pool's GFC allocation point. Can only be called by the owner.
-    function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,ICustom _lend,IERC20 _rewardToken) external onlyOwner,validatePoolByPid(_pid) {
+    function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate,uint256 _min,uint256 _max,uint256 _deposit_fee,uint256 _withdraw_fee,ICustom _lend,IERC20 _rewardToken) external onlyOwner validatePoolByPid(_pid) {
         if (_withUpdate) {
             massUpdatePools();
         }
@@ -235,11 +215,7 @@ contract HecoPool is Third {
             uint256 GFCReward = multiplier.mul(GFCPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
             accGFCPerShare = accGFCPerShare.add(GFCReward.mul(1e12).div(lpSupply));
         }
-        uint256 pending = user.amount.mul(accGFCPerShare).div(1e12).sub(user.rewardDebt);
-        if(user.lockTime > now){
-            return pending;
-        }
-        return pending.div(LockMulti);
+        return user.amount.mul(accGFCPerShare).div(1e12).sub(user.rewardDebt);
     }
 
     // Update reward variables for all pools. Be careful of gas spending!
@@ -283,9 +259,6 @@ contract HecoPool is Third {
         if (user.amount > 0) {
             uint256 pending = user.amount.mul(pool.accGFCPerShare).div(1e12).sub(user.rewardDebt);
             if(pending > 0) {
-                if(user.lockTime <= 0){ 
-                    pending = pending.div(LockMulti);
-                }
                 safeGFCTransfer(msg.sender, pending);
             }
         }
@@ -333,16 +306,13 @@ contract HecoPool is Third {
     }
 
     // Withdraw LP tokens from MasterChef.
-    function withdraw(uint256 _pid, uint256 _amount) public _lock_ {
+    function withdraw(uint256 _pid, uint256 _amount) public _lock_ validatePoolByPid {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
         updatePool(_pid);
         uint256 pending = user.amount.mul(pool.accGFCPerShare).div(1e12).sub(user.rewardDebt);
         if(pending > 0) {
-            if(user.lockTime <= 0){ 
-                pending = pending.div(LockMulti);
-            }
             safeGFCTransfer(msg.sender, pending);
         }
         if(_amount > 0) {
@@ -376,7 +346,7 @@ contract HecoPool is Third {
     }
 
     // Withdraw without caring about rewards. EMERGENCY ONLY.
-    function emergencyWithdraw(uint256 _pid) external _lock_ {
+    function emergencyWithdraw(uint256 _pid) external _lock_ validatePoolByPid {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         pool.lpToken.safeTransfer(address(msg.sender), user.amount);
