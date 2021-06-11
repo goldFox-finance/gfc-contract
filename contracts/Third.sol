@@ -8,13 +8,13 @@ contract Third is Ownable {
     uint256 public pause = 0;
 
     mapping (address => address) public routers;
-    address public WHT = 0x5545153CCFcA01fbd7Dd11C0b23ba694D9509A6F;
-    address public LHB = 0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c;
-    address public MDX = 0x25D2e80cB6B86881Fd7e07dd263Fb79f4AbE033c;
-    address public HUSD = 0x0298c2b32eaE4da002a15f36fdf7615BEa3DA047;
-    address public USDT = 0xa71EdC38d189767582C38A3145b5873052c3e47a;
-    address public ETH = 0x64FF637fB478863B7468bc97D30a5bF3A428a1fD;
-    address public HFIL = 0xae3a768f9aB104c69A7CD6041fE16fFa235d1810;
+    address public const WHT = 0x5545153CCFcA01fbd7Dd11C0b23ba694D9509A6F;
+    address public const LHB = 0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c;
+    address public const MDX = 0x25D2e80cB6B86881Fd7e07dd263Fb79f4AbE033c;
+    address public const HUSD = 0x0298c2b32eaE4da002a15f36fdf7615BEa3DA047;
+    address public const USDT = 0xa71EdC38d189767582C38A3145b5873052c3e47a;
+    address public const ETH = 0x64FF637fB478863B7468bc97D30a5bF3A428a1fD;
+    address public const HFIL = 0xae3a768f9aB104c69A7CD6041fE16fFa235d1810;
 
     function setPause(uint256 _pause) public onlyOwner{
         pause = _pause;
